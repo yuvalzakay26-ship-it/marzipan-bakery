@@ -152,7 +152,7 @@ const AccessibilityPage = () => {
 
                         {/* Update Date */}
                         <div className="text-sm text-gray-400 text-left pt-4">
-                            עודכן לאחרונה: אפריל 2026
+                            עודכן לאחרונה: מאי 2026
                         </div>
 
                     </div>

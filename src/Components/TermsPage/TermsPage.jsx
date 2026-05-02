@@ -37,7 +37,7 @@ const TermsPage = () => {
                     <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
                         השימוש באתר {BUSINESS_INFO.tradeName} ובטפסי ההזמנה שלו כפוף לתנאים שלהלן. אנא קראו אותם לפני שליחת הזמנה.
                     </p>
-                    <p className="text-sm text-gray-400 mt-4">עודכן לאחרונה: אפריל 2026</p>
+                    <p className="text-sm text-gray-400 mt-4">עודכן לאחרונה: מאי 2026</p>
                 </div>
 
                 {/* Body card */}

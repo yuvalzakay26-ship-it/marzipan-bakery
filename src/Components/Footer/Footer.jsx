@@ -240,6 +240,14 @@ const Footer = () => {
                         <Link to="/privacy" className="hover:text-[#D4AF37] transition-colors">פרטיות</Link>
                         <span className="text-white/10" aria-hidden="true">|</span>
                         <Link to="/accessibility" className="hover:text-[#D4AF37] transition-colors">נגישות</Link>
+                        <span className="text-white/10" aria-hidden="true">|</span>
+                        <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new Event("marzipan:open-cookie-settings"))}
+                            className="hover:text-[#D4AF37] transition-colors"
+                        >
+                            ניהול עוגיות
+                        </button>
                     </div>
                 </div>
             </div>

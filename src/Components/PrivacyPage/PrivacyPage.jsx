@@ -41,7 +41,7 @@ const PrivacyPage = () => {
                         אנחנו מתייחסים למידע שלכם ברצינות. הדף הזה מסביר באילו נתונים אנו נוגעים, למה, ומה הזכויות שלכם
                         לפי חוק הגנת הפרטיות, התשמ"א-1981.
                     </p>
-                    <p className="text-sm text-gray-400 mt-4">עודכן לאחרונה: אפריל 2026</p>
+                    <p className="text-sm text-gray-400 mt-4">עודכן לאחרונה: מאי 2026</p>
                 </div>
 
                 {/* Body card */}
@@ -88,9 +88,28 @@ const PrivacyPage = () => {
 
                     <Section icon={Lock} title="4. עוגיות (Cookies) וכלי מדידה">
                         <p>
-                            האתר משתמש בעוגיות הכרחיות לתפעול בלבד וב-Google Analytics לאיסוף נתונים סטטיסטיים אנונימיים על השימוש.
-                            ניתן לחסום עוגיות בהגדרות הדפדפן; חסימה לא תפגע ביכולת לבצע הזמנה דרך וואטסאפ.
+                            האתר משתמש בשני סוגי עוגיות בלבד:
                         </p>
+                        <ul className="list-disc pr-5 space-y-2 marker:text-[#D4AF37]">
+                            <li>
+                                <strong>עוגיות חיוניות</strong> — נדרשות לתפעול האתר, סל הקניות והעדפות נגישות. אלו פעילות תמיד ונשמרות מקומית בדפדפן.
+                            </li>
+                            <li>
+                                <strong>עוגיות סטטיסטיקה (Google Analytics)</strong> — אנונימיות, נטענות רק לאחר אישור מפורש שלכם בבאנר העוגיות.
+                                ה-IP מוסתר (anonymize_ip), ואיננו עושים שימוש בעוגיות פרסומיות או רימרקטינג.
+                            </li>
+                        </ul>
+                        <p>
+                            ניתן לשנות את ההעדפות בכל עת בלחיצה על "ניהול עוגיות" בתחתית האתר, או לחסום עוגיות בהגדרות הדפדפן.
+                            חסימה לא תפגע ביכולת לבצע הזמנה דרך וואטסאפ.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new Event("marzipan:open-cookie-settings"))}
+                            className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-full bg-[#FFF8E1] hover:bg-[#FCE4A8] border border-[#D4AF37]/40 text-[#380909] font-bold text-sm transition-colors"
+                        >
+                            פתיחת הגדרות העוגיות
+                        </button>
                     </Section>
 
                     <Section icon={Shield} title="5. אבטחת מידע">

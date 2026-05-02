@@ -16,7 +16,10 @@
       "Bash(node --check src/data/faqData.js)",
       "Bash(npx --no-install esbuild src/Components/Cart/CartDrawer.jsx src/Components/Cart/CheckoutModal.jsx src/Components/Contact/Contact.jsx src/Components/Home/OccasionPicker.jsx src/Components/ProductsPage/ProductsPage.jsx src/Components/Lead/ExitIntentModal.jsx --bundle=false --loader=jsx --log-level=error)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\COMPUTER\\\\Desktop\\\\Projects\\\\פרוייקטים בבנייה\\\\MarzipanBakery\" -Recurse -File)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(powershell -Command \"\\(Get-Content public/sitemap.xml -Raw\\) -replace '2026-04-29','2026-05-03' | Set-Content -Encoding UTF8 public/sitemap.xml\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const p='public/sitemap.xml';let s=fs.readFileSync\\(p,'utf8'\\);if\\(s.charCodeAt\\(0\\)===0xFEFF\\){s=s.slice\\(1\\);fs.writeFileSync\\(p,s,'utf8'\\);console.log\\('BOM stripped'\\);}else{console.log\\('no BOM'\\);}\")",
+      "Bash(git stash *)"
     ]
   }
 }

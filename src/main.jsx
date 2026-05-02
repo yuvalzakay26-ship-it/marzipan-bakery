@@ -5,11 +5,15 @@ import './index.css'
 import App from './App.jsx'
 import { BrowserRouter } from 'react-router-dom'
 
-import { initGA, initChannelTracking } from './utils/analytics'
+import { initGA, initChannelTracking, hasAnalyticsConsent } from './utils/analytics'
 
-// Initialize Analytics + acquisition channel tracking (UTM/referrer attribution).
-initGA();
-initChannelTracking();
+// Privacy-first analytics: GA is loaded ONLY after the visitor accepts
+// analytics cookies via CookieConsent. Returning visitors who already
+// accepted will have GA loaded immediately on this boot.
+if (hasAnalyticsConsent()) {
+    initGA();
+    initChannelTracking();
+}
 
 import ErrorBoundary from './Components/Shared/ErrorBoundary'
 

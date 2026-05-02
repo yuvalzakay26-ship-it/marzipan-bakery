@@ -25,6 +25,7 @@ import SchemaMarkup from "./Components/Shared/SchemaMarkup";
 import StickyMobileCTA from "./Components/Shared/StickyMobileCTA";
 import ReorderPrompt from "./Components/Shared/ReorderPrompt";
 import AccessibilityWidget from "./Components/Shared/AccessibilityWidget";
+import CookieConsent from "./Components/Shared/CookieConsent";
 
 // Phase 3 routes — lazy-loaded so they never affect the marketing-site bundle.
 const OrderConfirmation  = lazy(() => import("./Components/Checkout/OrderConfirmation"));
@@ -158,6 +159,7 @@ function App() {
           <StickyMobileCTA />
           <ReorderPrompt />
           <AccessibilityWidget />
+          <CookieConsent />
           <Suspense fallback={null}>
             <ExitIntentModal />
           </Suspense>

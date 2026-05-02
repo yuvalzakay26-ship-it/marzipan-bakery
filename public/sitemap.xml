@@ -3,31 +3,31 @@
   <!-- Core marketing pages -->
   <url>
     <loc>https://marzipanbakery.com/</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/products</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/about</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/branches</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/contact</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -35,13 +35,13 @@
   <!-- Holiday pages -->
   <url>
     <loc>https://marzipanbakery.com/holidays/hanukkah</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/holidays/shavuot</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -49,37 +49,37 @@
   <!-- Growth: Jerusalem SEO authority hub + landings -->
   <url>
     <loc>https://marzipanbakery.com/jerusalem</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/jerusalem/best-rugelach</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/jerusalem/shabbat-pastries</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/jerusalem/gift-boxes</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/jerusalem/office-trays</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/jerusalem/mahane-yehuda-bakery-guide</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
@@ -87,31 +87,31 @@
   <!-- Growth: Stories / Content flywheel -->
   <url>
     <loc>https://marzipanbakery.com/stories</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/stories/recipe-of-the-rugelach</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/stories/behind-the-counter</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/stories/founders-story</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.75</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/stories/bakery-secrets</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -119,20 +119,21 @@
   <!-- Legal -->
   <url>
     <loc>https://marzipanbakery.com/terms</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/privacy</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://marzipanbakery.com/accessibility</loc>
-    <lastmod>2026-04-29</lastmod>
+    <lastmod>2026-05-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 </urlset>
+

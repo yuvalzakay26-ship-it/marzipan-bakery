@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import contactBg from "../../assets/contact_bg_v2.png";
 import { Send, MapPin, Phone, Mail, Star } from "lucide-react";
 import { FaWhatsapp, FaFacebook, FaInstagram } from "react-icons/fa";
@@ -12,6 +13,7 @@ const Contact = () => {
         email: "",
         branch: "",
         message: "",
+        privacyConsent: false,
         newsletter: false,
         _honey: "" // Anti-spam honeypot
     });
@@ -45,6 +47,10 @@ const Contact = () => {
         // Message validation
         if (!formData.message.trim()) newErrors.message = "נא לכתוב הודעה";
         else if (formData.message.trim().length < 10) newErrors.message = "ההודעה חייבת להכיל לפחות 10 תווים";
+
+        // Privacy consent — required by Israeli Privacy Protection Law (1981)
+        // for any submission that includes personal contact details.
+        if (!formData.privacyConsent) newErrors.privacyConsent = "יש לאשר את מדיניות הפרטיות כדי לשלוח את הפנייה";
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -108,7 +114,7 @@ const Contact = () => {
                     });
                 });
 
-                setFormData({ name: "", phone: "", email: "", branch: "", message: "", newsletter: false, _honey: "" });
+                setFormData({ name: "", phone: "", email: "", branch: "", message: "", privacyConsent: false, newsletter: false, _honey: "" });
             } catch (error) {
                 console.error('EmailJS Error:', error);
                 setSubmitStatus('error');
@@ -382,8 +388,41 @@ const Contact = () => {
                                     {errors.message && <p className="text-red-500 text-xs mt-1 mr-1">{errors.message}</p>}
                                 </div>
 
-                                {/* Row 4: Newsletter Checkbox */}
-                                <div className="flex items-center gap-3 justify-start pt-2">
+                                {/* Row 4a: Privacy consent (REQUIRED) */}
+                                <div className="pt-2">
+                                    <div className="flex items-start gap-3 justify-start">
+                                        <div className="relative flex items-center mt-0.5">
+                                            <input
+                                                type="checkbox"
+                                                id="privacyConsent"
+                                                name="privacyConsent"
+                                                checked={formData.privacyConsent}
+                                                onChange={handleChange}
+                                                aria-required="true"
+                                                aria-invalid={!!errors.privacyConsent}
+                                                aria-describedby={errors.privacyConsent ? "privacy-consent-error" : undefined}
+                                                className={`peer w-5 h-5 text-[#B91C1C] border-2 rounded focus:ring-[#B91C1C] cursor-pointer transition-all checked:bg-[#B91C1C] checked:border-[#B91C1C] ${errors.privacyConsent ? "border-red-400" : "border-gray-300"}`}
+                                            />
+                                            <svg className="absolute w-3.5 h-3.5 text-white pointer-events-none opacity-0 peer-checked:opacity-100 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200" viewBox="0 0 14 14" fill="none">
+                                                <path d="M3 8L6 11L11 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                            </svg>
+                                        </div>
+                                        <label htmlFor="privacyConsent" className="text-gray-700 text-sm leading-relaxed select-none cursor-pointer">
+                                            <span className="text-[#B91C1C]">*</span> קראתי ואני מסכים/ה שמאפיית מרציפן תשתמש בפרטים שלי כדי לחזור אליי בנוגע לפנייה זו, בהתאם ל
+                                            <Link to="/privacy" className="text-[#B91C1C] font-bold hover:text-[#380909] underline decoration-[#D4AF37]/40 underline-offset-4 mx-1">מדיניות הפרטיות</Link>
+                                            ול
+                                            <Link to="/terms" className="text-[#B91C1C] font-bold hover:text-[#380909] underline decoration-[#D4AF37]/40 underline-offset-4 mx-1">תנאי השימוש</Link>.
+                                        </label>
+                                    </div>
+                                    {errors.privacyConsent && (
+                                        <p id="privacy-consent-error" className="text-red-500 text-xs mt-2 mr-8">
+                                            {errors.privacyConsent}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Row 4b: Newsletter (OPTIONAL — separate, opt-in marketing) */}
+                                <div className="flex items-center gap-3 justify-start">
                                     <div className="relative flex items-center">
                                         <input
                                             type="checkbox"
@@ -398,7 +437,7 @@ const Contact = () => {
                                         </svg>
                                     </div>
                                     <label htmlFor="newsletter" className="text-gray-600 font-medium text-sm select-none cursor-pointer hover:text-[#B91C1C] transition-colors">
-                                        אשמח לקבל הטבות ומבצעים מתוקים למייל 🍰
+                                        אשמח לקבל הטבות ומבצעים מתוקים למייל (אופציונלי, ניתן לבטל בכל עת)
                                     </label>
                                 </div>
 

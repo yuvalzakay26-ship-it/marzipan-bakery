@@ -1,13 +1,37 @@
 // Google Analytics 4 + acquisition channel tracking utility.
+//
+// Consent gating: GA4 is NEVER loaded until the visitor explicitly accepts
+// analytics cookies via CookieConsent. This keeps the site aligned with the
+// Israeli Privacy Protection Law (התשמ"א-1981) and EU/GDPR practice for
+// non-essential tracking. Until consent, trackEvent() becomes a no-op (or
+// a dev-only console echo).
 
 const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_ID;
 const CHANNEL_KEY = 'marzipan_channel';
 const CHANNEL_TS_KEY = 'marzipan_channel_ts';
 const CHANNEL_TTL_DAYS = 30;
+const CONSENT_KEY = 'marzipan_cookie_consent';
+
+export const hasAnalyticsConsent = () => {
+    if (typeof window === 'undefined') return false;
+    try {
+        const raw = localStorage.getItem(CONSENT_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        return parsed?.analytics === true;
+    } catch {
+        return false;
+    }
+};
 
 export const initGA = () => {
     if (!GA_MEASUREMENT_ID) {
         console.warn("Analytics: GA_MEASUREMENT_ID is missing in .env");
+        return;
+    }
+
+    if (!hasAnalyticsConsent()) {
+        // Visitor hasn't accepted analytics cookies — do NOT load gtag.
         return;
     }
 
@@ -21,7 +45,7 @@ export const initGA = () => {
         function gtag() { window.dataLayer.push(arguments); }
         window.gtag = gtag;
         gtag('js', new Date());
-        gtag('config', GA_MEASUREMENT_ID);
+        gtag('config', GA_MEASUREMENT_ID, { anonymize_ip: true });
     }
 };
 
@@ -74,6 +98,14 @@ export const getChannel = () => {
 };
 
 export const trackEvent = (eventName, params = {}) => {
+    if (!hasAnalyticsConsent()) {
+        // Without consent, analytics is fully silent.
+        if (import.meta.env.DEV) {
+            console.log(`[Analytics — no consent] ${eventName}`, params);
+        }
+        return;
+    }
+
     const channel = getChannel();
     const enriched = channel ? { ...channel, ...params } : params;
 
