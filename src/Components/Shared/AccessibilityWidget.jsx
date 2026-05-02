@@ -164,7 +164,10 @@ const AccessibilityWidget = () => {
     // (fixed/transformed/filtered) can ever change the widget's anchoring.
     return createPortal(
         <>
-            {/* Floating toggle button — left side per IL convention.
+            {/* Floating toggle button.
+                Desktop (lg+): left side per IL convention.
+                Mobile (<lg): right side, anchored above the StickyMobileCTA bar
+                via safe-area-aware offset, stacked below ScrollToTopButton.
                 position:fixed inside a fixed/inset-0 host stays viewport-anchored. */}
             <button
                 ref={buttonRef}
@@ -174,7 +177,7 @@ const AccessibilityWidget = () => {
                 aria-expanded={open}
                 aria-controls="a11y-panel"
                 style={{ pointerEvents: "auto" }}
-                className="fixed bottom-5 left-4 sm:bottom-6 sm:left-5 inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#1B6FB6] text-white shadow-[0_12px_28px_-10px_rgba(27,111,182,0.6)] ring-2 ring-white hover:bg-[#155890] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1B6FB6]/40 transition-colors"
+                className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 lg:bottom-6 lg:left-5 lg:right-auto inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#1B6FB6] text-white shadow-[0_12px_28px_-10px_rgba(27,111,182,0.6)] ring-2 ring-white hover:bg-[#155890] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1B6FB6]/40 transition-colors"
             >
                 <Accessibility size={22} aria-hidden="true" />
             </button>

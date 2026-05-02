@@ -28,7 +28,7 @@ const ScrollToTopButton = () => {
     };
 
     return (
-        <div className="fixed bottom-24 lg:bottom-8 right-4 sm:right-8 z-50">
+        <div className="fixed bottom-[calc(10.5rem+env(safe-area-inset-bottom))] right-4 lg:bottom-8 lg:right-8 z-50">
             <button
                 type="button"
                 onClick={scrollToTop}
