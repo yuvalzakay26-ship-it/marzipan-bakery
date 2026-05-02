@@ -109,12 +109,18 @@ const Navbar = () => {
     const isHolidayActive = location.pathname.startsWith("/holidays");
     const isGuidesActive  = GUIDES.some((i) => i.href && location.pathname === i.href);
 
+    // While the mobile sheet is open the bar must read as a solid grounded
+    // surface (so it doesn't blend into the darkened drawer backdrop) and must
+    // sit above the portaled drawer (z-[120]). Height stays tied to `scrolled`
+    // only so opening the menu never shifts the layout.
+    const elevated = scrolled || isOpen;
+
     return (
         <>
         <header
             ref={navRef}
-            className={`fixed top-0 inset-x-0 z-50 font-sans transition-all duration-300 ${
-                scrolled
+            className={`fixed top-0 inset-x-0 ${isOpen ? "z-[130]" : "z-50"} font-sans transition-all duration-300 ${
+                elevated
                     ? "bg-[#FDFBF7]/92 backdrop-blur-md shadow-[0_8px_24px_-12px_rgba(56,9,9,0.18)] border-b border-[#D4AF37]/15"
                     : "bg-[#FDFBF7]/70 backdrop-blur-sm"
             }`}
@@ -246,13 +252,16 @@ const Navbar = () => {
                 aria-hidden={!isOpen}
                 dir="rtl"
             >
-                {/* Tappable backdrop — closes the menu on outside tap. */}
+                {/* Tappable backdrop — closes the menu on outside tap. Starts
+                    below the live navbar height (h-20 unscrolled / h-16 scrolled
+                    on mobile) so the bar never gets tinted by the dim/blur layer
+                    and stays fully readable while the sheet is open. */}
                 <button
                     type="button"
                     aria-label="סגירת תפריט"
                     tabIndex={isOpen ? 0 : -1}
                     onClick={() => setIsOpen(false)}
-                    className="absolute inset-0 w-full h-full bg-[#1A0F0A]/45 backdrop-blur-sm cursor-default"
+                    className={`absolute inset-x-0 bottom-0 ${scrolled ? "top-16" : "top-20"} bg-[#1A0F0A]/45 backdrop-blur-sm cursor-default`}
                 />
 
                 {/* Sheet — solid cream surface, dynamic offset clears the live navbar
