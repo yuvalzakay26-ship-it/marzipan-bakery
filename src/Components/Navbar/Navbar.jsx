@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Menu, X, ChevronDown, ShoppingBag, BookOpen, MessageCircle } from "lucide-react";
 import logo from "../../assets/logo.jpg";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -56,13 +57,22 @@ const Navbar = () => {
         return () => document.removeEventListener("keydown", onKey);
     }, []);
 
-    // Lock body scroll when mobile sheet is open.
+    // Lock body scroll when mobile sheet is open. Lock <html> too — iOS Safari
+    // ignores body-only locks once a touch-scroll has started, and the global
+    // `overflow-x: hidden` rule in index.css means the inline override needs to
+    // re-apply x-hidden on cleanup so horizontal-overflow protection survives.
     useEffect(() => {
-        if (isOpen) {
-            const prev = document.body.style.overflow;
-            document.body.style.overflow = "hidden";
-            return () => { document.body.style.overflow = prev; };
-        }
+        if (!isOpen) return;
+        const html = document.documentElement;
+        const body = document.body;
+        const prevBody = body.style.overflow;
+        const prevHtml = html.style.overflow;
+        body.style.overflow = "hidden";
+        html.style.overflow = "hidden";
+        return () => {
+            body.style.overflow = prevBody;
+            html.style.overflow = prevHtml;
+        };
     }, [isOpen]);
 
     // Primary nav — visible at all times on desktop. Order is intentional:
@@ -100,6 +110,7 @@ const Navbar = () => {
     const isGuidesActive  = GUIDES.some((i) => i.href && location.pathname === i.href);
 
     return (
+        <>
         <header
             ref={navRef}
             className={`fixed top-0 inset-x-0 z-50 font-sans transition-all duration-300 ${
@@ -219,79 +230,111 @@ const Navbar = () => {
                 </div>
             </div>
 
-            {/* Mobile sheet */}
+        </header>
+
+        {/* Mobile sheet — portaled to document.body to escape the stacking-context
+            cap from <div className="relative z-10"> in App.jsx. Without the portal,
+            StickyMobileCTA (z-[95] inside the same z-10 context) renders above the
+            sheet and covers the bottom links once the user has scrolled past the
+            hero. Portaling lifts the sheet to body level, where z-[120] sits above
+            the CTA bar but is still below the accessibility widget. */}
+        {createPortal(
             <div
-                id="mobile-menu"
-                className={`lg:hidden fixed inset-x-0 top-[64px] bottom-0 z-40 bg-[#FDFBF7] transition-all duration-300 ease-out overflow-y-auto ${
-                    isOpen ? "opacity-100 visible translate-y-0" : "opacity-0 invisible -translate-y-2 pointer-events-none"
+                className={`lg:hidden fixed inset-0 z-[120] transition-opacity duration-300 ${
+                    isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                 }`}
-                role="dialog"
-                aria-modal="true"
-                aria-label="תפריט ניווט"
+                aria-hidden={!isOpen}
+                dir="rtl"
             >
-                <nav className="px-5 sm:px-6 py-6 max-w-md mx-auto" aria-label="תפריט ראשי נייד">
-                    <ul className="space-y-1">
-                        {PRIMARY.map((link) =>
-                            link.items ? (
-                                <li key={link.key}>
-                                    <MobileGroupHeader>{link.name}</MobileGroupHeader>
-                                    <ul className="space-y-1 pr-3">
-                                        {link.items.map((item) => (
-                                            <li key={item.href}>
-                                                <MobileLink to={item.href} onClick={() => setIsOpen(false)} active={isActive(item.href)}>
-                                                    {item.name}
-                                                </MobileLink>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </li>
-                            ) : (
-                                <li key={link.href}>
-                                    <MobileLink to={link.href} onClick={() => setIsOpen(false)} active={isActive(link.href)}>
-                                        {link.name}
+                {/* Tappable backdrop — closes the menu on outside tap. */}
+                <button
+                    type="button"
+                    aria-label="סגירת תפריט"
+                    tabIndex={isOpen ? 0 : -1}
+                    onClick={() => setIsOpen(false)}
+                    className="absolute inset-0 w-full h-full bg-[#1A0F0A]/45 backdrop-blur-sm cursor-default"
+                />
+
+                {/* Sheet — solid cream surface, dynamic offset clears the live navbar
+                    height (h-20 unscrolled / h-16 scrolled on mobile), so the first
+                    item is never hidden behind the bar. */}
+                <div
+                    id="mobile-menu"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="תפריט ניווט"
+                    className={`absolute inset-x-0 bg-[#FDFBF7] shadow-[0_24px_60px_-30px_rgba(56,9,9,0.45)] border-b border-[#D4AF37]/20 overflow-y-auto overscroll-contain transition-transform duration-300 ease-out ${
+                        isOpen ? "translate-y-0" : "-translate-y-3"
+                    } ${scrolled ? "top-16" : "top-20"} bottom-0`}
+                    style={{ WebkitOverflowScrolling: "touch" }}
+                >
+                    <nav className="px-5 sm:px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-w-md mx-auto" aria-label="תפריט ראשי נייד">
+                        <ul className="space-y-1">
+                            {PRIMARY.map((link) =>
+                                link.items ? (
+                                    <li key={link.key}>
+                                        <MobileGroupHeader>{link.name}</MobileGroupHeader>
+                                        <ul className="space-y-1 pr-3">
+                                            {link.items.map((item) => (
+                                                <li key={item.href}>
+                                                    <MobileLink to={item.href} onClick={() => setIsOpen(false)} active={isActive(item.href)}>
+                                                        {item.name}
+                                                    </MobileLink>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </li>
+                                ) : (
+                                    <li key={link.href}>
+                                        <MobileLink to={link.href} onClick={() => setIsOpen(false)} active={isActive(link.href)}>
+                                            {link.name}
+                                        </MobileLink>
+                                    </li>
+                                )
+                            )}
+                        </ul>
+
+                        <hr className="border-[#D4AF37]/20 my-5" />
+
+                        {/* Guides on mobile — same long-tail items as the desktop dropdown,
+                            rendered subtle so they don't compete with the primary list. */}
+                        <MobileGroupHeader>מדריכים</MobileGroupHeader>
+                        <ul className="space-y-1">
+                            {GUIDES.map((item) => (
+                                <li key={item.href}>
+                                    <MobileLink to={item.href} onClick={() => setIsOpen(false)} active={isActive(item.href)} subtle>
+                                        {item.name}
                                     </MobileLink>
                                 </li>
-                            )
-                        )}
-                    </ul>
+                            ))}
+                        </ul>
 
-                    <hr className="border-[#D4AF37]/20 my-5" />
-
-                    {/* Guides on mobile — same long-tail items as the desktop dropdown,
-                        rendered subtle so they don't compete with the primary list. */}
-                    <MobileGroupHeader>מדריכים</MobileGroupHeader>
-                    <ul className="space-y-1">
-                        {GUIDES.map((item) => (
-                            <li key={item.href}>
-                                <MobileLink to={item.href} onClick={() => setIsOpen(false)} active={isActive(item.href)} subtle>
-                                    {item.name}
-                                </MobileLink>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <div className="mt-7 grid grid-cols-2 gap-3">
-                        <a
-                            href={`https://wa.me/${CONTACT_INFO.whatsapp}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-white border border-[#25D366]/40 text-[#25D366] font-bold hover:bg-[#25D366] hover:text-white transition-colors min-h-[48px]"
-                        >
-                            <MessageCircle size={16} aria-hidden="true" />
-                            וואטסאפ
-                        </a>
-                        <button
-                            type="button"
-                            onClick={() => { setIsOpen(false); toggleCart(); }}
-                            className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-[#380909] text-white font-bold ring-1 ring-[#D4AF37]/40 hover:bg-[#B91C1C] transition-colors min-h-[48px]"
-                        >
-                            <ShoppingBag size={16} aria-hidden="true" />
-                            הסל ({cartCount})
-                        </button>
-                    </div>
-                </nav>
-            </div>
-        </header>
+                        <div className="mt-7 grid grid-cols-2 gap-3">
+                            <a
+                                href={`https://wa.me/${CONTACT_INFO.whatsapp}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={() => setIsOpen(false)}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-white border border-[#25D366]/40 text-[#25D366] font-bold hover:bg-[#25D366] hover:text-white transition-colors min-h-[48px]"
+                            >
+                                <MessageCircle size={16} aria-hidden="true" />
+                                וואטסאפ
+                            </a>
+                            <button
+                                type="button"
+                                onClick={() => { setIsOpen(false); toggleCart(); }}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full bg-[#380909] text-white font-bold ring-1 ring-[#D4AF37]/40 hover:bg-[#B91C1C] transition-colors min-h-[48px]"
+                            >
+                                <ShoppingBag size={16} aria-hidden="true" />
+                                הסל ({cartCount})
+                            </button>
+                        </div>
+                    </nav>
+                </div>
+            </div>,
+            document.body
+        )}
+        </>
     );
 };
 
