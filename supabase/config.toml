@@ -1,0 +1,39 @@
+# Marzipan Bakery — Supabase project configuration.
+# Run `supabase link --project-ref <ref>` to bind this dir to a hosted project.
+
+project_id = "marzipanbakery"
+
+[api]
+enabled       = true
+port          = 54321
+schemas       = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows      = 1000
+
+[auth]
+enabled              = true
+site_url             = "https://marzipanbakery.com"
+additional_redirect_urls = ["http://localhost:5173", "https://marzipanbakery.com/admin"]
+jwt_expiry           = 3600
+enable_signup        = false   # Customers come in via OTP; admins are seeded manually.
+
+[auth.sms]
+enable_signup     = true
+enable_confirmations = true
+template          = "מאפיית מרציפן: קוד הכניסה שלך הוא {{ .Code }}"
+otp_expiry        = 600
+
+[auth.sms.twilio]
+# Configure these as Supabase project secrets, not in this file.
+# account_sid       = "env:TWILIO_ACCOUNT_SID"
+# auth_token        = "env:TWILIO_AUTH_TOKEN"
+# message_service_sid = "env:TWILIO_MESSAGE_SERVICE_SID"
+
+[functions.place-order]
+verify_jwt = false   # Public — we accept anonymous orders.
+
+[functions.payment-webhook]
+verify_jwt = false   # PSPs call this without a Supabase JWT.
+
+[functions.request-otp]
+verify_jwt = false

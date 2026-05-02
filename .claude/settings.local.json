@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npx eslint *)",
+      "Bash(xargs grep *)",
+      "Bash(node -e \"require\\('fs'\\).readFileSync\\('src/Components/Home/Home.jsx','utf8'\\); console.log\\('Home.jsx OK'\\)\")",
+      "Bash(node -e \"['src/Components/Home/Home.jsx','src/Components/Home/FAQ.jsx','src/Components/Home/Bundles.jsx','src/Components/Home/VIPClub.jsx','src/Components/Reviews/Reviews.jsx','src/Components/Lead/HolidayPreorderList.jsx','src/Components/Shared/TrustBar.jsx','src/Components/Products/Products.jsx'].forEach\\(f => { require\\('fs'\\).readFileSync\\(f,'utf8'\\); console.log\\(f, 'OK'\\); }\\);\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\COMPUTER\\\\Desktop\\\\Projects\\\\פרוייקטים בבנייה\\\\MarzipanBakery\\\\src\\\\Components\" -Recurse -Filter \"*.jsx\" -o File)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\COMPUTER\\\\Desktop\\\\Projects\\\\פרוייקטים בבנייה\\\\MarzipanBakery\\\\src\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Bash(npx --no-install eslint src/Components/Cart/CartDrawer.jsx src/Components/Cart/CheckoutModal.jsx src/Components/Contact/Contact.jsx src/Components/Home/OccasionPicker.jsx src/Components/ProductsPage/ProductsPage.jsx src/Components/Lead/ExitIntentModal.jsx --no-eslintrc --rule \"{}\" --parser-options=ecmaVersion:2022,sourceType:module,ecmaFeatures:{jsx:true})",
+      "Bash(node --check src/data/productsData.js)",
+      "Bash(node --check src/data/faqData.js)",
+      "Bash(npx --no-install esbuild src/Components/Cart/CartDrawer.jsx src/Components/Cart/CheckoutModal.jsx src/Components/Contact/Contact.jsx src/Components/Home/OccasionPicker.jsx src/Components/ProductsPage/ProductsPage.jsx src/Components/Lead/ExitIntentModal.jsx --bundle=false --loader=jsx --log-level=error)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\COMPUTER\\\\Desktop\\\\Projects\\\\פרוייקטים בבנייה\\\\MarzipanBakery\" -Recurse -File)"
+    ]
+  }
+}

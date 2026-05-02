@@ -1,0 +1,245 @@
+@import "tailwindcss";
+
+:root {
+    /* Option 1: Classic & High Contrast */
+    --color-primary-red: #B91C1C;
+    /* Main Red */
+    --color-highlight-gold: #C0C0C0;
+    /* Silver Accent (replacing Gold) */
+    --color-text-main: #111111;
+    /* Jet Black/Dark Charcoal */
+    --color-bg-page: #F5F5F5;
+    /* Light Grey/White */
+    --color-bg-surface: #FFFFFF;
+    /* Pure White */
+
+    --color-gold-primary: var(--color-primary-red);
+    /* Mapping old vars to new system for safety */
+    --color-gold-light: #F3F4F6;
+    /* Light Silver/Grey */
+    --color-dark-brown: var(--color-text-main);
+    --color-cream-bg: var(--color-bg-page);
+    --font-heading: 'Heebo', sans-serif;
+}
+
+body {
+    background-color: var(--color-cream-bg);
+    color: var(--color-dark-brown);
+    font-family: 'Heebo', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+@keyframes heartbeat-color {
+
+    0%,
+    100% {
+        transform: scale(1);
+        color: #B91C1C;
+        /* Red */
+        fill: #B91C1C;
+    }
+
+    15% {
+        transform: scale(1.15);
+    }
+
+    30% {
+        transform: scale(1);
+        color: #B91C1C;
+        fill: #B91C1C;
+    }
+
+    45% {
+        transform: scale(1.15);
+        color: #ffffff;
+        /* White on big beat? Or just shift? User said "colors white and red" */
+        fill: #ffffff;
+    }
+
+    60% {
+        transform: scale(1);
+        color: #B91C1C;
+        fill: #B91C1C;
+    }
+}
+
+/* Simpler heartbeat that fits "slowly" */
+@keyframes beat-color-mix {
+    0% {
+        transform: scale(1);
+        color: #B91C1C;
+    }
+
+    14% {
+        transform: scale(1.1);
+        color: #ffffff;
+    }
+
+    28% {
+        transform: scale(1);
+        color: #B91C1C;
+    }
+
+    42% {
+        transform: scale(1.1);
+        color: #ffffff;
+    }
+
+    70% {
+        transform: scale(1);
+        color: #B91C1C;
+    }
+
+    100% {
+        transform: scale(1);
+        color: #B91C1C;
+    }
+}
+
+.animate-heart-slow {
+    animation: beat-color-mix 3s infinite ease-in-out;
+    fill: currentColor;
+    /* Forces the fill to match the stroke color permanently */
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.8s ease-out forwards;
+    opacity: 0; /* Start hidden */
+}
+
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }
+.delay-400 { animation-delay: 400ms; }
+
+/* Premium baseline — smoother scroll for hero "scroll" affordance + headings. */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Honor user motion preference — premium brands respect this. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+/* Editorial gold underline for luxe display headings. */
+.luxe-underline {
+    position: relative;
+    display: inline-block;
+}
+.luxe-underline::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -6px;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(to left, transparent, #D4AF37, transparent);
+}
+
+/* =====================================================================
+ * Accessibility widget — modes applied via attributes on <html>.
+ * Driven by AccessibilityWidget.jsx; persisted in localStorage.
+ *
+ * Layout-stability invariant:
+ *   No accessibility mode is allowed to introduce horizontal scrolling
+ *   or to break `position: fixed` anchoring. Two rules enforce this:
+ *
+ *   1. The grayscale filter is applied to <html>, NOT <body>. Putting
+ *      `filter` on <body> turns body into the containing block for every
+ *      fixed-positioned descendant (per CSS Filter Effects 1 §6), which
+ *      lets decorative blur orbs and scaled hero images push body wider
+ *      than viewport, dragging the floating accessibility button along.
+ *      Filter on <html> keeps the viewport itself as the practical
+ *      containing block, so fixed elements stay anchored.
+ *
+ *   2. `overflow-x: hidden` is set on html + body unconditionally so any
+ *      stray decoration that bleeds past 100vw never produces a scrollbar.
+ * ===================================================================== */
+
+/* Default scale (overridden by JS via inline style on <html>) */
+:root { --a11y-font-scale: 1; }
+
+/* Font scaling — leaves layout intact; line-height stays relative. */
+html { font-size: calc(16px * var(--a11y-font-scale, 1)); }
+
+/* Universal horizontal-overflow guard — applies in every mode. */
+html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+/* High-contrast mode — neutral page, near-black ink, links bold red. */
+html[data-a11y-contrast] {
+    background: #ffffff !important;
+}
+html[data-a11y-contrast] body {
+    background: #ffffff !important;
+    color: #0b0b0b !important;
+}
+html[data-a11y-contrast] a,
+html[data-a11y-contrast] button {
+    color: #B91C1C !important;
+}
+html[data-a11y-contrast] *::selection {
+    background: #ffe66d;
+    color: #000;
+}
+
+/* Grayscale — applied at the document root so fixed elements stay viewport-
+   anchored. See invariant above. */
+html[data-a11y-grayscale] {
+    filter: grayscale(1);
+}
+
+/* Reduce motion — same envelope as the OS preference query. */
+html[data-a11y-reduce-motion] *,
+html[data-a11y-reduce-motion] *::before,
+html[data-a11y-reduce-motion] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
+
+/* Underline links — disambiguates clickable text for low-vision users. */
+html[data-a11y-underline] a {
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+}
+
+/* Floating widget hard-isolation: its own positioning context, max z-index,
+   and explicit pointer/auto handling so no app overlay can ever cover it. */
+[data-a11y-widget-root] {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2147483640; /* near INT32_MAX — above every app modal */
+    isolation: isolate;
+}
+[data-a11y-widget-root] > * {
+    pointer-events: auto;
+}
