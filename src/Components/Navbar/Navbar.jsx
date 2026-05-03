@@ -110,16 +110,21 @@ const Navbar = () => {
     const isGuidesActive  = GUIDES.some((i) => i.href && location.pathname === i.href);
 
     // While the mobile sheet is open the bar must read as a solid grounded
-    // surface (so it doesn't blend into the darkened drawer backdrop) and must
-    // sit above the portaled drawer (z-[120]). Height stays tied to `scrolled`
-    // only so opening the menu never shifts the layout.
+    // surface so it doesn't blend into the darkened drawer backdrop. Height
+    // stays tied to `scrolled` only so opening the menu never shifts the
+    // layout. Note: bumping z-index here is pointless — the navbar lives
+    // inside a `relative z-10` wrapper in App.jsx, so its effective stack
+    // position is capped below the portaled drawer at z-[120] regardless.
+    // Click reachability is solved by giving the drawer wrapper
+    // pointer-events-none and only restoring auto on its visible children
+    // (which sit below the navbar height).
     const elevated = scrolled || isOpen;
 
     return (
         <>
         <header
             ref={navRef}
-            className={`fixed top-0 inset-x-0 ${isOpen ? "z-[130]" : "z-50"} font-sans transition-all duration-300 ${
+            className={`fixed top-0 inset-x-0 z-50 font-sans transition-all duration-300 ${
                 elevated
                     ? "bg-[#FDFBF7]/92 backdrop-blur-md shadow-[0_8px_24px_-12px_rgba(56,9,9,0.18)] border-b border-[#D4AF37]/15"
                     : "bg-[#FDFBF7]/70 backdrop-blur-sm"
@@ -245,9 +250,13 @@ const Navbar = () => {
             hero. Portaling lifts the sheet to body level, where z-[120] sits above
             the CTA bar but is still below the accessibility widget. */}
         {createPortal(
+            // Wrapper is a transparent positioning shell only — pointer-events
+            // stay none here so the navbar zone (which the wrapper visually
+            // covers but doesn't paint into) never has its clicks intercepted.
+            // The backdrop and sheet below opt back into pointer-events-auto.
             <div
-                className={`lg:hidden fixed inset-0 z-[120] transition-opacity duration-300 ${
-                    isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                className={`lg:hidden fixed inset-0 z-[120] pointer-events-none transition-opacity duration-300 ${
+                    isOpen ? "opacity-100" : "opacity-0"
                 }`}
                 aria-hidden={!isOpen}
                 dir="rtl"
@@ -261,7 +270,7 @@ const Navbar = () => {
                     aria-label="סגירת תפריט"
                     tabIndex={isOpen ? 0 : -1}
                     onClick={() => setIsOpen(false)}
-                    className={`absolute inset-x-0 bottom-0 ${scrolled ? "top-16" : "top-20"} bg-[#1A0F0A]/45 backdrop-blur-sm cursor-default`}
+                    className={`absolute inset-x-0 bottom-0 ${scrolled ? "top-16" : "top-20"} bg-[#1A0F0A]/45 backdrop-blur-sm cursor-default ${isOpen ? "pointer-events-auto" : "pointer-events-none"}`}
                 />
 
                 {/* Sheet — solid cream surface, dynamic offset clears the live navbar
@@ -273,7 +282,7 @@ const Navbar = () => {
                     aria-modal="true"
                     aria-label="תפריט ניווט"
                     className={`absolute inset-x-0 bg-[#FDFBF7] shadow-[0_24px_60px_-30px_rgba(56,9,9,0.45)] border-b border-[#D4AF37]/20 overflow-y-auto overscroll-contain transition-transform duration-300 ease-out ${
-                        isOpen ? "translate-y-0" : "-translate-y-3"
+                        isOpen ? "translate-y-0 pointer-events-auto" : "-translate-y-3 pointer-events-none"
                     } ${scrolled ? "top-16" : "top-20"} bottom-0`}
                     style={{ WebkitOverflowScrolling: "touch" }}
                 >
