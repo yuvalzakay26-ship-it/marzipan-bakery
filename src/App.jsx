@@ -7,6 +7,7 @@ import Footer from "./Components/Footer/Footer";
 import Home from "./Components/Home/Home";
 import ScrollToTop from "./Components/ScrollToTop";
 import ProductsPage from "./Components/ProductsPage/ProductsPage";
+import ProductPage from "./Components/ProductPage/ProductPage";
 import AboutPage from "./Components/AboutPage/AboutPage";
 import BranchesPage from "./Components/BranchesPage/BranchesPage";
 import ContactPage from "./Components/ContactPage/ContactPage";
@@ -115,6 +116,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<ProductsPage />} />
+              <Route path="/products/:slug" element={<ProductPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/branches" element={<BranchesPage />} />
               <Route path="/contact" element={<ContactPage />} />

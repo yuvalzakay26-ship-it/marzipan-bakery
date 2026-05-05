@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { ShoppingBag, Check, Plus, Flame } from 'lucide-react';
 import SkeletonImage from '../Shared/SkeletonImage';
 import ProductBadges from '../Shared/ProductBadges';
@@ -42,7 +43,14 @@ const ProductCard = ({ product }) => {
         return () => observer.disconnect();
     }, [product.id, product.name, product.priceValue]);
 
-    const handleAddToCart = () => {
+    // The card is wrapped in a <Link> so clicks anywhere on it open the
+    // product page. The add-to-cart buttons sit inside that link, so we
+    // explicitly stop the event from bubbling up to trigger navigation.
+    const handleAddToCart = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         addToCart(product);
         trackEvent(ANALYTICS_EVENTS.ADD_TO_CART, {
             product_id: product.id,
@@ -58,8 +66,10 @@ const ProductCard = ({ product }) => {
     const hasDescription = Boolean(product.description);
 
     return (
-        <div
+        <Link
             ref={cardRef}
+            to={`/products/${product.slug}`}
+            aria-label={`צפו ב${product.name}`}
             className="group bg-white rounded-3xl overflow-hidden shadow-[0_12px_32px_-20px_rgba(56,9,9,0.25)] hover:shadow-[0_28px_60px_-25px_rgba(56,9,9,0.45)] transition-all duration-500 border border-[#D4AF37]/15 hover:border-[#D4AF37]/50 flex flex-col h-full transform hover:-translate-y-1 relative"
         >
             {/* Image — taller, editorial framing */}
@@ -83,10 +93,10 @@ const ProductCard = ({ product }) => {
                 )}
 
                 {/* Category chip — bottom-left, premium gold pill */}
-                {product.category && (
+                {product.category_slug && (
                     <div className="absolute bottom-3 left-3 z-20">
                         <span className="bg-white/95 backdrop-blur-sm text-[#380909] text-[10px] font-bold tracking-[0.18em] uppercase px-3 py-1.5 rounded-full shadow-sm border border-[#D4AF37]/30">
-                            {product.category}
+                            {product.category_slug}
                         </span>
                     </div>
                 )}
@@ -168,7 +178,7 @@ const ProductCard = ({ product }) => {
                     )}
                 </button>
             </div>
-        </div>
+        </Link>
     );
 };
 

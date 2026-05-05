@@ -1,103 +1,54 @@
-import React, { useState, useEffect } from "react";
-import { productsData } from '../../data/productsData.js';
+import React, { useState, useEffect, useMemo } from "react";
 import { Search, ShoppingBag, Filter, Wheat, Cookie, ChefHat } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import SkeletonImage from "../Shared/SkeletonImage";
 import SEO from "../Shared/SEO";
 import ProductCard from "../Product/ProductCard";
 import SchemaMarkup from "../Shared/SchemaMarkup";
+import { useProducts } from "../../hooks/useProducts";
 
-const ProductsPage = () => {
-    const [searchParams] = useSearchParams();
-    const [activeCategory, setActiveCategory] = useState("all");
-    const [searchTerm, setSearchTerm] = useState("");
+const CATEGORIES = [
+    { id: "all", label: "הכל", keywords: [] },
+    { id: "rugelach", label: "רוגלך", keywords: ["רוגלך", "רוגאלך", "רוגאלכים"] },
+    { id: "dairy-pastries", label: "מאפים מתוקים חלבי", keywords: ["קוראסון", "קוראסונים", "מאפה", "מאפים"] },
+    { id: "donuts", label: "סופגניות", keywords: ["סופגניה", "סופגניות", "דונאט", "דונאטס"] },
+    { id: "fridge-cakes", label: "עוגות עגולות חלבי", keywords: ["עוגה", "עוגות"] },
+    { id: "round-parve-cakes", label: "עוגות עגולות פרווה", keywords: ["עוגה", "פרווה"] },
+    { id: "babka-cakes", label: "עוגות בובקט", keywords: ["בובקט"] },
+    { id: "hard-cookies", label: "עוגיות קשות", keywords: ["עוגיות", "בישקוטים"] },
+    { id: "tarts", label: "טארטים", keywords: ["טארט", "טארטים"] },
+    { id: "bread", label: "לחמים וחלות", keywords: ["לחם", "לחמים", "חלה", "חלות"] }
+];
 
-    useEffect(() => {
-        window.scrollTo(0, 0);
-        const categoryParam = searchParams.get("category");
-        if (categoryParam) {
-            setActiveCategory(categoryParam);
-        } else {
-            setActiveCategory("all");
-        }
-    }, [searchParams]);
-
-    // Automatically switch to "all" when searching
-    useEffect(() => {
-        if (searchTerm) {
-            setActiveCategory("all");
-        }
-    }, [searchTerm]);
-
-    const categories = [
-        { id: "all", label: "הכל", keywords: [] },
-        { id: "rugelach", label: "רוגלך", keywords: ["רוגלך", "רוגאלך", "רוגאלכים"] },
-        { id: "sweetDairyPastries", label: "מאפים מתוקים חלבי", keywords: ["קוראסון", "קוראסונים", "מאפה", "מאפים"] },
-        { id: "donuts", label: "סופגניות", keywords: ["סופגניה", "סופגניות", "דונאט", "דונאטס"] },
-        { id: "fridgeCakes", label: "עוגות עגולות חלבי", keywords: ["עוגה", "עוגות"] },
-        { id: "roundParveCakes", label: "עוגות עגולות גדולות פרווה", keywords: ["עוגה", "פרווה"] },
-        { id: "roundParveCakesNew", label: "עוגות עגולות פרווה", keywords: ["עוגה", "פרווה"] },
-        { id: "babkaCakes", label: "עוגות בובקט", keywords: ["בובקט"] },
-        { id: "hardCookies", label: "עוגיות קשות", keywords: ["עוגיות", "בישקוטים"] },
-        { id: "tarts", label: "טארטים", keywords: ["טארט", "טארטים"] },
-        { id: "bread", label: "לחמים וחלות", keywords: ["לחם", "לחמים", "חלה", "חלות"] },
-    ];
-
-    // Safely get products for a category
-    const getCategoryProducts = (key, label) => {
-        // Safe access: if productsData or the key is missing, return empty array
-        const list = productsData?.[key] || [];
-        return list.map(p => ({ ...p, category: label, categoryId: key }));
-    };
-
-    // Combine all efficiently inside useMemo or component body (it's small enough here)
-    const allProducts = [
-        ...getCategoryProducts("rugelach", "רוגלך"),
-        ...getCategoryProducts("sweetDairyPastries", "מאפים מתוקים חלבי"),
-        ...getCategoryProducts("donuts", "סופגניות"),
-        ...getCategoryProducts("fridgeCakes", "עוגות עגולות חלבי"),
-        ...getCategoryProducts("roundParveCakes", "עוגות עגולות גדולות פרווה"),
-        ...getCategoryProducts("roundParveCakesNew", "עוגות עגולות פרווה"),
-        ...getCategoryProducts("babkaCakes", "עוגות בובקט"),
-        ...getCategoryProducts("hardCookies", "עוגיות קשות"),
-        ...getCategoryProducts("tarts", "טארטים"),
-        ...getCategoryProducts("bread", "לחמים וחלות"),
-    ];
-
-    const finalProducts = searchTerm
-        ? allProducts.filter(p => {
-            const categoryObj = categories.find(c => c.id === p.categoryId);
-            const searchLower = searchTerm.trim().toLowerCase();
-
-            // Helper to check if any word in a string includes the search term (partial match)
-            const matchesWord = (str) => str?.toLowerCase().includes(searchLower);
-
+function filterProducts(products, { activeCategory, searchTerm }) {
+    if (searchTerm) {
+        const needle = searchTerm.trim().toLowerCase();
+        return products.filter(p => {
+            const cat = CATEGORIES.find(c => c.id === p.category_slug);
             return (
-                matchesWord(p.name) ||
-                matchesWord(p.category) ||
-                (categoryObj?.keywords?.some(k => k.toLowerCase().startsWith(searchLower)))
+                p.name?.toLowerCase().includes(needle) ||
+                p.description?.toLowerCase().includes(needle) ||
+                p.category_slug?.toLowerCase().includes(needle) ||
+                cat?.keywords?.some(k => k.toLowerCase().startsWith(needle))
             );
-        })
-        : activeCategory === "all"
-            ? allProducts
-            : allProducts.filter(p => p.categoryId === activeCategory);
+        });
+    }
+    if (activeCategory === "all") return products;
+    return products.filter(p => p.category_slug === activeCategory);
+}
 
-    // Calculate page title based on category
-    const categoryLabel = categories.find(c => c.id === activeCategory)?.label || "כל המוצרים";
-    const pageTitle = `קטלוג - ${categoryLabel}`;
-
-    // Schema.org ItemList
-    const itemListSchema = {
+function buildItemListSchema(products) {
+    return {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        "itemListElement": finalProducts.map((product, index) => ({
+        "itemListElement": products.map((product, index) => ({
             "@type": "ListItem",
             "position": index + 1,
             "item": {
                 "@type": "Product",
                 "name": product.name,
-                "image": product.image, // Ideally absolute URL
-                "description": "מאפה טרי מבית מאפיית מרציפן",
+                "image": product.image,
+                "description": product.description || "מאפה טרי מבית מאפיית מרציפן",
                 "offers": {
                     "@type": "Offer",
                     "priceCurrency": "ILS",
@@ -107,6 +58,79 @@ const ProductsPage = () => {
             }
         }))
     };
+}
+
+const GRID_CLASSES = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8";
+
+const ProductsGrid = ({ loading, error, products }) => {
+    if (loading) {
+        return (
+            <div className={GRID_CLASSES}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                        key={i}
+                        className="h-[440px] rounded-3xl bg-gray-100 animate-pulse border border-gray-200"
+                    />
+                ))}
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-white border border-red-200 rounded-2xl p-10 text-center shadow-sm">
+                <h3 className="text-xl font-bold text-[#B91C1C] mb-2">לא הצלחנו לטעון את הקטלוג</h3>
+                <p className="text-[#5D4037] font-light">
+                    אירעה שגיאה בטעינת המוצרים. נסו לרענן את הדף בעוד רגע.
+                </p>
+            </div>
+        );
+    }
+
+    if (products.length === 0) {
+        return (
+            <div className="bg-white border border-[#D4AF37]/30 rounded-2xl p-10 text-center shadow-sm">
+                <h3 className="text-xl font-bold text-[#380909] mb-2">לא נמצאו מוצרים</h3>
+                <p className="text-[#5D4037] font-light">נסו קטגוריה אחרת או חיפוש אחר.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className={GRID_CLASSES}>
+            {products.map(product => (
+                <ProductCard key={product.id} product={product} />
+            ))}
+        </div>
+    );
+};
+
+const ProductsPage = () => {
+    const [searchParams] = useSearchParams();
+    const [activeCategory, setActiveCategory] = useState("all");
+    const [searchTerm, setSearchTerm] = useState("");
+
+    const { products, loading, error } = useProducts();
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+        const categoryParam = searchParams.get("category");
+        setActiveCategory(categoryParam || "all");
+    }, [searchParams]);
+
+    // Automatically switch to "all" when searching
+    useEffect(() => {
+        if (searchTerm) setActiveCategory("all");
+    }, [searchTerm]);
+
+    const finalProducts = useMemo(
+        () => filterProducts(products, { activeCategory, searchTerm }),
+        [products, activeCategory, searchTerm]
+    );
+
+    const categoryLabel = CATEGORIES.find(c => c.id === activeCategory)?.label || "כל המוצרים";
+    const pageTitle = `קטלוג - ${categoryLabel}`;
+    const itemListSchema = useMemo(() => buildItemListSchema(finalProducts), [finalProducts]);
 
     return (
         <div className="min-h-screen bg-white/90 font-sans pb-24 relative overflow-hidden backdrop-blur-sm">
@@ -165,7 +189,7 @@ const ProductsPage = () => {
                         <div className="inline-flex items-center gap-3 px-8 py-3 bg-white border border-[#D4AF37]/30 rounded-full shadow-[0_4px_20px_-5px_rgba(212,175,55,0.2)] hover:shadow-[0_8px_25px_-8px_rgba(185,28,28,0.2)] transition-all duration-300 transform hover:-translate-y-1">
                             <span className="text-gray-400 font-light text-sm tracking-wide">צפייה ב:</span>
                             <span className="text-[#B91C1C] text-xl font-bold tracking-tight">
-                                {categories.find(c => c.id === activeCategory)?.label}
+                                {categoryLabel}
                             </span>
                         </div>
                     </div>
@@ -198,7 +222,7 @@ const ProductsPage = () => {
                                 קטגוריות
                             </h3>
                             <ul className="space-y-2">
-                                {categories.map(cat => (
+                                {CATEGORIES.map(cat => (
                                     <li key={cat.id}>
                                         <button
                                             onClick={() => {
@@ -222,11 +246,11 @@ const ProductsPage = () => {
 
                 {/* Product Grid */}
                 <div className="lg:w-3/4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        {finalProducts.map((product, index) => (
-                            <ProductCard key={index} product={product} />
-                        ))}
-                    </div>
+                    <ProductsGrid
+                        loading={loading}
+                        error={error}
+                        products={finalProducts}
+                    />
                 </div>
             </div>
         </div>

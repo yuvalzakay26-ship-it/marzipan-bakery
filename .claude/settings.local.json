@@ -19,7 +19,9 @@
       "Bash(npx vite *)",
       "Bash(powershell -Command \"\\(Get-Content public/sitemap.xml -Raw\\) -replace '2026-04-29','2026-05-03' | Set-Content -Encoding UTF8 public/sitemap.xml\")",
       "Bash(node -e \"const fs=require\\('fs'\\);const p='public/sitemap.xml';let s=fs.readFileSync\\(p,'utf8'\\);if\\(s.charCodeAt\\(0\\)===0xFEFF\\){s=s.slice\\(1\\);fs.writeFileSync\\(p,s,'utf8'\\);console.log\\('BOM stripped'\\);}else{console.log\\('no BOM'\\);}\")",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(grep *)",
+      "Bash(curl *)"
     ]
   }
 }

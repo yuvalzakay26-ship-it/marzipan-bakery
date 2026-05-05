@@ -7,7 +7,6 @@ import Donuts from "../../assets/Donuts/ChocolateCrackers.jpg";
 import Tarts from "../../assets/Tarts/BrownieTart.jpg";
 import FridgeCakes from "../../assets/FridgeCakes/Kinder.jpg";
 import RoundParveImg from "../../assets/RoundParveCakes/NougatMousse.jpg";
-import BlackForestImg from "../../assets/RoundParveCakes/BlackForest.jpg";
 import BabkaImg from "../../assets/BabkaCakes/PoppyBabka.jpg";
 import HardCookiesImg from "../../assets/HardCookies/Biscotti.jpg";
 
@@ -28,7 +27,7 @@ const CATEGORIES = [
         badge: { label: "האייקון של מרציפן", tone: "iconic" }
     },
     {
-        id: "sweetDairyPastries",
+        id: "dairy-pastries",
         title: "מאפים חלביים",
         img: SweetPastriesImg,
         desc: "קוראסונים זהובים בפיסטוק, פררו וריבת חלב — נשקלים בקילו.",
@@ -36,7 +35,7 @@ const CATEGORIES = [
         badge: { label: "בחירת הקהל", tone: "favorite" }
     },
     {
-        id: "fridgeCakes",
+        id: "fridge-cakes",
         title: "עוגות מקרר",
         img: FridgeCakes,
         desc: "מוס קטיפתי בקינדר, מוצרט וטירמיסו — מוכן לקחת הביתה.",
@@ -44,7 +43,7 @@ const CATEGORIES = [
         badge: { label: "ארוז למתנה", tone: "gift" }
     },
     {
-        id: "babkaCakes",
+        id: "babka-cakes",
         title: "בבקה",
         img: BabkaImg,
         desc: "פרג עשיר ושוקולד שזור — קלאסיקה לערב שישי.",
@@ -66,21 +65,14 @@ const CATEGORIES = [
         priceFrom: "₪10"
     },
     {
-        id: "roundParveCakes",
+        id: "round-parve-cakes",
         title: "עוגות מוס פרווה",
         img: RoundParveImg,
         desc: "מוס נוגט וקיש שוקולד — לארוחות שבת ואירועים.",
         priceFrom: "מ-₪65"
     },
     {
-        id: "roundParveCakesNew",
-        title: "עוגות חגיגה",
-        img: BlackForestImg,
-        desc: "יער שחור, טופי, מיקס — לאירוע הקרוב.",
-        priceFrom: "מ-₪65"
-    },
-    {
-        id: "hardCookies",
+        id: "hard-cookies",
         title: "עוגיות פריכות",
         img: HardCookiesImg,
         desc: "בישקוטי שקדים ואוזני המן ללא סוכר — לקפה אחר הצהריים.",
