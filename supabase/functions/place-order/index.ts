@@ -2,24 +2,36 @@
 // place-order  —  Edge Function
 //
 // POST  /functions/v1/place-order
-// Body: {
-//   contact: { name, phone, email? },
-//   branchId: uuid,
-//   fulfillment: 'pickup' | 'delivery',
-//   pickupTimeText?: string,
-//   deliveryAddress?: string,
-//   items: [{ productId?: uuid, bundleId?: uuid, quantity: int }],
-//   promoCode?: string,
-//   notes?: string,
-//   channel?: 'web' | 'whatsapp'
-// }
+//
+// Accepts two payload shapes; both run through the same pipeline.
+//
+// (1) Rich shape (existing consumers):
+//     {
+//       contact: { name, phone, email? },
+//       branchId: uuid,
+//       fulfillment: 'pickup' | 'delivery',
+//       pickupTimeText?: string,
+//       deliveryAddress?: string,
+//       items: [{ productId?: uuid, legacyId?: int, bundleId?: uuid, quantity: int }],
+//       promoCode?: string,
+//       notes?: string,
+//       channel?: 'web' | 'whatsapp'
+//     }
+//     → { orderId, orderNumber, totalAgorot, status }
+//
+// (2) Simple shape (new CheckoutPage):
+//     {
+//       customer: { name, phone, address, notes? },
+//       items:    [{ product_id: uuid|int, quantity, price? }],
+//       total_price?
+//     }
+//     → { success: true, order_id }
+//
 // Headers:
 //   x-idempotency-key   recommended; same key → same order returned.
 //
-// Returns: { orderNumber, orderId, totalAgorot, status }
-//
-// Server is the SOURCE OF TRUTH for prices. The client sends only
-// productId + quantity — never trust client-provided prices.
+// Server is the SOURCE OF TRUTH for prices. Any price/total in the body
+// is accepted but ignored — the order total is recomputed from the DB.
 // =====================================================================
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -60,6 +72,31 @@ const RequestSchema = z.object({
     channel:         z.enum(['web', 'whatsapp']).default('web')
 });
 
+// ---------------------------------------------------------------------
+// Simple payload (new CheckoutPage shape). Translated to the rich shape
+// before the rest of the pipeline runs, so all existing logic — rate
+// limiting, idempotency, server-authoritative pricing, notifications —
+// applies unchanged. Response is also collapsed to { success, order_id }.
+// ---------------------------------------------------------------------
+const SimpleItemSchema = z.object({
+    product_id: z.union([z.string().uuid(), z.number().int().positive()]),
+    quantity:   z.number().int().positive().max(99),
+    // `price` is accepted but ignored — server recomputes from DB.
+    price:      z.number().nonnegative().optional()
+});
+
+const SimpleRequestSchema = z.object({
+    customer: z.object({
+        name:    z.string().min(2).max(120),
+        phone:   z.string().min(7).max(20),
+        address: z.string().min(2).max(240),
+        notes:   z.string().max(500).optional().nullable()
+    }),
+    items:       z.array(SimpleItemSchema).min(1).max(50),
+    // Accepted for client display; server recomputes the authoritative total.
+    total_price: z.number().nonnegative().optional()
+});
+
 serve(async (req) => {
     const cors = corsHeaders(req.headers.get('origin'));
     const opts = handleOptions(req);
@@ -83,11 +120,59 @@ serve(async (req) => {
     try { body = await req.json(); }
     catch { return json(400, { error: 'invalid_json' }, cors); }
 
-    const parsed = RequestSchema.safeParse(body);
-    if (!parsed.success) {
-        return json(400, { error: 'validation_failed', details: parsed.error.flatten() }, cors);
+    // Detect simple payload (new CheckoutPage) vs rich payload (existing
+    // consumers). Simple has top-level `customer`; rich has top-level `contact`.
+    const bodyObj = (body && typeof body === 'object') ? (body as Record<string, unknown>) : {};
+    const isSimpleShape = 'customer' in bodyObj && !('contact' in bodyObj);
+
+    let input: z.infer<typeof RequestSchema>;
+    if (isSimpleShape) {
+        const parsedSimple = SimpleRequestSchema.safeParse(body);
+        if (!parsedSimple.success) {
+            return json(400, { error: 'validation_failed', details: parsedSimple.error.flatten() }, cors);
+        }
+        const simple = parsedSimple.data;
+
+        // Pick a default branch — first active, non-deleted branch by creation
+        // order. The simple payload has no branch concept; the existing schema
+        // requires one (NOT NULL FK), so we use the first seeded branch.
+        const { data: defaultBranch, error: branchLookupErr } = await admin
+            .from('branches')
+            .select('id')
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+        if (branchLookupErr || !defaultBranch) {
+            return json(500, { error: 'no_branch_configured' }, cors);
+        }
+
+        input = {
+            contact: {
+                name:  simple.customer.name,
+                phone: simple.customer.phone
+            },
+            branchId:        defaultBranch.id,
+            // `pickup` matches the seeded branch's capabilities. The address is
+            // still captured below in delivery_address regardless of fulfillment.
+            fulfillment:     'pickup',
+            deliveryAddress: simple.customer.address,
+            items: simple.items.map((it) =>
+                typeof it.product_id === 'number'
+                    ? { legacyId: it.product_id, quantity: it.quantity }
+                    : { productId: it.product_id, quantity: it.quantity }
+            ),
+            notes:   simple.customer.notes ?? undefined,
+            channel: 'web'
+        };
+    } else {
+        const parsed = RequestSchema.safeParse(body);
+        if (!parsed.success) {
+            return json(400, { error: 'validation_failed', details: parsed.error.flatten() }, cors);
+        }
+        input = parsed.data;
     }
-    const input = parsed.data;
 
     // -------------------- normalize phone --------------------
     const phoneE164 = normalizeILPhone(input.contact.phone);
@@ -108,6 +193,9 @@ serve(async (req) => {
             .eq('payment_provider_ref', `idem:${idemKey}`)
             .maybeSingle();
         if (existing) {
+            if (isSimpleShape) {
+                return json(200, { success: true, order_id: existing.id }, cors);
+            }
             return json(200, {
                 orderId: existing.id,
                 orderNumber: existing.order_number,
@@ -400,6 +488,10 @@ serve(async (req) => {
         .update({ recovered_order_id: order.id })
         .eq('phone_e164', phoneE164)
         .is('recovered_order_id', null);
+
+    if (isSimpleShape) {
+        return json(200, { success: true, order_id: order.id }, cors);
+    }
 
     return json(200, {
         orderId: order.id,

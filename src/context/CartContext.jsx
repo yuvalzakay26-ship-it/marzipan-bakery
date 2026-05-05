@@ -5,6 +5,15 @@ import { productsData } from '../data/productsData';
 const allProducts = Object.values(productsData).flat();
 const getProductById = (id) => allProducts.find(item => item.id === id);
 
+// Additive aliases for checkout/order/payment compatibility.
+// Original fields (priceValue, image, slug) are preserved.
+const withAliases = (item) => ({
+    ...item,
+    price: item.priceValue,
+    image_url: item.image,
+    slug: item.slug,
+});
+
 const CartContext = createContext();
 
 export const useCart = () => useContext(CartContext);
@@ -31,7 +40,7 @@ export const CartProvider = ({ children }) => {
                 .map(savedItem => {
                     const product = getProductById(savedItem.id);
                     if (!product) return null; // Product deleted from catalog
-                    return { ...product, quantity: savedItem.quantity };
+                    return withAliases({ ...product, quantity: savedItem.quantity });
                 })
                 .filter(item => item !== null);
 
@@ -67,7 +76,7 @@ export const CartProvider = ({ children }) => {
                 );
             }
             // Ensure we use the full product object passed (which should match schema)
-            return [...prevItems, { ...product, quantity: 1 }];
+            return [...prevItems, withAliases({ ...product, quantity: 1 })];
         });
         setIsCartOpen(true);
     };
@@ -76,11 +85,13 @@ export const CartProvider = ({ children }) => {
         setCartItems(prevItems => prevItems.filter(item => item.id !== productId));
     };
 
-    const updateQuantity = (productId, change) => {
+    const updateQuantity = (productId, value, mode = "delta") => {
         setCartItems(prevItems => {
             return prevItems.map(item => {
                 if (item.id === productId) {
-                    const newQuantity = Math.max(0, item.quantity + change);
+                    const newQuantity = mode === "absolute"
+                        ? Math.max(0, value)
+                        : Math.max(0, item.quantity + value);
                     return { ...item, quantity: newQuantity };
                 }
                 return item;
@@ -112,7 +123,8 @@ export const CartProvider = ({ children }) => {
         toggleCart,
         setIsCartOpen,
         cartCount,
-        cartTotal
+        cartTotal,
+        totalPrice: cartTotal
     };
 
     return (
