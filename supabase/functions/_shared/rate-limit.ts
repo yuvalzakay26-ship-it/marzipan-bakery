@@ -2,11 +2,18 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 /**
  * Sliding-window rate limit using the rate_limits table.
- * Returns true if the request is allowed, false if it should be rejected.
+ *
+ * Atomic and fail-closed.
+ *
+ *   - Atomic: increments via the rate_limit_hit RPC, which uses
+ *     INSERT...ON CONFLICT DO UPDATE returning the post-increment
+ *     count. Concurrent callers cannot observe the same value.
+ *   - Fail-closed: any error talking to the database returns false
+ *     (block the request) rather than silently allowing it through.
  *
  * key:    e.g. "place-order:+97250...".  Bucket per phone for ordering;
  *              per IP for OTP (request-otp:1.2.3.4).
- * limit:  number of requests allowed in `windowSec` seconds.
+ * limit:  max number of requests permitted in `windowSec` seconds.
  */
 export async function checkRateLimit(
     admin: SupabaseClient,
@@ -14,42 +21,30 @@ export async function checkRateLimit(
     limit: number,
     windowSec: number
 ): Promise<boolean> {
-    const now = new Date();
-    const windowStart = new Date(Math.floor(now.getTime() / (windowSec * 1000)) * windowSec * 1000);
+    const now = Date.now();
+    const windowStart = new Date(
+        Math.floor(now / (windowSec * 1000)) * windowSec * 1000
+    );
 
-    const { data, error } = await admin
-        .from('rate_limits')
-        .upsert(
-            { key, window_start: windowStart.toISOString(), count: 1 },
-            { onConflict: 'key,window_start', ignoreDuplicates: false }
-        )
-        .select()
-        .single();
+    const { data, error } = await admin.rpc('rate_limit_hit', {
+        p_key:          key,
+        p_window_start: windowStart.toISOString(),
+        p_limit:        limit
+    });
 
     if (error) {
-        // Fail open on rate-limit storage error — log but do not block the user.
-        console.error('rate_limit_upsert_error', error);
-        return true;
-    }
-
-    if ((data?.count ?? 1) > limit) {
-        // The upsert above only inserts the first row; we increment via RPC for
-        // subsequent calls. Simpler: do a second update.
-        await admin
-            .from('rate_limits')
-            .update({ count: (data?.count ?? 1) + 1 })
-            .eq('key', key)
-            .eq('window_start', windowStart.toISOString());
+        // Storage layer is unreachable — block. We deliberately do not
+        // fall back to "allow" here; an unreachable limiter is the exact
+        // condition under which abuse is most damaging.
+        console.error('rate_limit_rpc_error', { key, message: error.message });
         return false;
     }
 
-    // Increment the counter for subsequent hits in the same window.
-    await admin.rpc('exec_increment_rate_limit', {
-        p_key: key,
-        p_window_start: windowStart.toISOString()
-    }).then(() => {}, () => {
-        // RPC may not exist yet — ignore. The upsert above already created the row.
-    });
-
-    return true;
+    // The RPC returns a single row { allowed, current_count }.
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row.allowed !== 'boolean') {
+        console.error('rate_limit_unexpected_shape', { key, data });
+        return false;
+    }
+    return row.allowed;
 }

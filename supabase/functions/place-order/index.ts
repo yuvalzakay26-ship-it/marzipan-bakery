@@ -37,11 +37,21 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { z } from 'https://esm.sh/zod@3.23.8';
-import { corsHeaders, handleOptions } from '../_shared/cors.ts';
 import { checkRateLimit } from '../_shared/rate-limit.ts';
 import { normalizeILPhone, isE164 } from '../_shared/phone.ts';
 import { enqueueNotification } from '../_shared/notifications/enqueue.ts';
 import { firstName } from '../_shared/notifications/templates.ts';
+
+// Wildcard CORS — every browser origin is allowed to invoke place-order.
+// `x-idempotency-key` is included because the client uses it to dedupe
+// place-order retries; omitting it from the preflight allowlist would
+// block the second-and-later submits of the same idempotent request.
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers':
+        'authorization, x-client-info, apikey, content-type, x-idempotency-key',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+};
 
 const ItemSchema = z.object({
     productId: z.string().uuid().optional(),
@@ -78,8 +88,16 @@ const RequestSchema = z.object({
 // limiting, idempotency, server-authoritative pricing, notifications —
 // applies unchanged. Response is also collapsed to { success, order_id }.
 // ---------------------------------------------------------------------
+// Order matters: integers and numeric strings (legacy_id) are tried before
+// the UUID branch so the validator never surfaces a misleading "Invalid uuid"
+// for what is, in fact, a legacy_id. A numeric string ("106") is coerced into
+// an int so the downstream `typeof === 'number'` branch routes it to legacyId.
 const SimpleItemSchema = z.object({
-    product_id: z.union([z.string().uuid(), z.number().int().positive()]),
+    product_id: z.union([
+        z.number().int().positive(),
+        z.string().regex(/^\d+$/).transform((s) => Number(s)),
+        z.string().uuid()
+    ]),
     quantity:   z.number().int().positive().max(99),
     // `price` is accepted but ignored — server recomputes from DB.
     price:      z.number().nonnegative().optional()
@@ -98,27 +116,27 @@ const SimpleRequestSchema = z.object({
 });
 
 serve(async (req) => {
-    const cors = corsHeaders(req.headers.get('origin'));
-    const opts = handleOptions(req);
-    if (opts) return opts;
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
 
     if (req.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'method_not_allowed' }), {
-            status: 405, headers: { ...cors, 'content-type': 'application/json' }
+            status: 405, headers: { ...corsHeaders, 'content-type': 'application/json' }
         });
     }
 
     const url = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !serviceKey) {
-        return json(500, { error: 'server_misconfigured' }, cors);
+        return json(500, { error: 'server_misconfigured' });
     }
     const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
     // -------------------- parse --------------------
     let body: unknown;
     try { body = await req.json(); }
-    catch { return json(400, { error: 'invalid_json' }, cors); }
+    catch { return json(400, { error: 'invalid_json' }); }
 
     // Detect simple payload (new CheckoutPage) vs rich payload (existing
     // consumers). Simple has top-level `customer`; rich has top-level `contact`.
@@ -129,7 +147,7 @@ serve(async (req) => {
     if (isSimpleShape) {
         const parsedSimple = SimpleRequestSchema.safeParse(body);
         if (!parsedSimple.success) {
-            return json(400, { error: 'validation_failed', details: parsedSimple.error.flatten() }, cors);
+            return json(400, { error: 'validation_failed', details: parsedSimple.error.flatten() });
         }
         const simple = parsedSimple.data;
 
@@ -145,7 +163,7 @@ serve(async (req) => {
             .limit(1)
             .maybeSingle();
         if (branchLookupErr || !defaultBranch) {
-            return json(500, { error: 'no_branch_configured' }, cors);
+            return json(500, { error: 'no_branch_configured' });
         }
 
         input = {
@@ -158,18 +176,22 @@ serve(async (req) => {
             // still captured below in delivery_address regardless of fulfillment.
             fulfillment:     'pickup',
             deliveryAddress: simple.customer.address,
-            items: simple.items.map((it) =>
-                typeof it.product_id === 'number'
-                    ? { legacyId: it.product_id, quantity: it.quantity }
-                    : { productId: it.product_id, quantity: it.quantity }
-            ),
+            // Number → legacy_id (int from productsData.js) → resolved to real
+            // UUID via products.legacy_id below. UUID-string → products.id
+            // directly. Integer ids must NEVER reach the UUID column.
+            items: simple.items.map((it) => {
+                if (typeof it.product_id === 'number') {
+                    return { legacyId: it.product_id, quantity: it.quantity };
+                }
+                return { productId: it.product_id, quantity: it.quantity };
+            }),
             notes:   simple.customer.notes ?? undefined,
             channel: 'web'
         };
     } else {
         const parsed = RequestSchema.safeParse(body);
         if (!parsed.success) {
-            return json(400, { error: 'validation_failed', details: parsed.error.flatten() }, cors);
+            return json(400, { error: 'validation_failed', details: parsed.error.flatten() });
         }
         input = parsed.data;
     }
@@ -177,24 +199,28 @@ serve(async (req) => {
     // -------------------- normalize phone --------------------
     const phoneE164 = normalizeILPhone(input.contact.phone);
     if (!phoneE164 || !isE164(phoneE164)) {
-        return json(400, { error: 'invalid_phone' }, cors);
+        return json(400, { error: 'invalid_phone' });
     }
 
     // -------------------- rate limit (5 / 5min / phone) --------------------
     const allowed = await checkRateLimit(admin, `place-order:${phoneE164}`, 5, 300);
-    if (!allowed) return json(429, { error: 'rate_limited' }, cors);
+    if (!allowed) return json(429, { error: 'rate_limited' });
 
     // -------------------- idempotency --------------------
+    // Dedicated column + unique partial index (orders_idempotency_key_unique).
+    // payment_provider_ref is reserved for PSP transaction refs; do NOT
+    // overload it here. The unique index also guards the race between the
+    // pre-insert lookup and the actual INSERT — see the 23505 handler below.
     const idemKey = req.headers.get('x-idempotency-key');
     if (idemKey) {
         const { data: existing } = await admin
             .from('orders')
             .select('id, order_number, total_agorot, status')
-            .eq('payment_provider_ref', `idem:${idemKey}`)
+            .eq('order_idempotency_key', idemKey)
             .maybeSingle();
         if (existing) {
             if (isSimpleShape) {
-                return json(200, { success: true, order_id: existing.id }, cors);
+                return json(200, { success: true, order_id: existing.id });
             }
             return json(200, {
                 orderId: existing.id,
@@ -202,7 +228,7 @@ serve(async (req) => {
                 totalAgorot: existing.total_agorot,
                 status: existing.status,
                 idempotent: true
-            }, cors);
+            });
         }
     }
 
@@ -213,13 +239,13 @@ serve(async (req) => {
         .eq('id', input.branchId)
         .single();
     if (branchErr || !branch || branch.deleted_at || !branch.is_active) {
-        return json(400, { error: 'invalid_branch' }, cors);
+        return json(400, { error: 'invalid_branch' });
     }
     if (input.fulfillment === 'pickup' && !branch.accepts_pickup) {
-        return json(400, { error: 'branch_no_pickup' }, cors);
+        return json(400, { error: 'branch_no_pickup' });
     }
     if (input.fulfillment === 'delivery' && !branch.accepts_delivery) {
-        return json(400, { error: 'branch_no_delivery' }, cors);
+        return json(400, { error: 'branch_no_delivery' });
     }
 
     // -------------------- price lookup --------------------
@@ -265,10 +291,10 @@ serve(async (req) => {
                     error: 'product_unavailable',
                     productId: item.productId,
                     legacyId: item.legacyId
-                }, cors);
+                });
             }
             if (p.is_sold_out) {
-                return json(409, { error: 'product_sold_out', productId: p.id, name: p.name_he }, cors);
+                return json(409, { error: 'product_sold_out', productId: p.id, name: p.name_he });
             }
             const lineTotal = BigInt(p.price_agorot) * BigInt(item.quantity);
             subtotalAgorot += lineTotal;
@@ -284,7 +310,7 @@ serve(async (req) => {
         } else if (item.bundleId) {
             const b = bundleById.get(item.bundleId);
             if (!b || !b.is_active || b.deleted_at) {
-                return json(400, { error: 'bundle_unavailable', bundleId: item.bundleId }, cors);
+                return json(400, { error: 'bundle_unavailable', bundleId: item.bundleId });
             }
             const lineTotal = BigInt(b.bundle_price_agorot) * BigInt(item.quantity);
             subtotalAgorot += lineTotal;
@@ -362,7 +388,7 @@ serve(async (req) => {
             })
             .select('id')
             .single();
-        if (custErr || !created) return json(500, { error: 'customer_create_failed' }, cors);
+        if (custErr || !created) return json(500, { error: 'customer_create_failed' });
         customerId = created.id;
     } else {
         await admin.from('customers').update({
@@ -373,17 +399,21 @@ serve(async (req) => {
     }
 
     // -------------------- order number --------------------
+    // Atomic per-day counter via next_order_number RPC. INSERT...ON CONFLICT
+    // DO UPDATE inside the function returns a strictly monotonic sequence per
+    // UTC day, so concurrent place-order calls cannot collide on order_number.
     const today = new Date();
     const yyyy = today.getUTCFullYear();
     const mm   = String(today.getUTCMonth() + 1).padStart(2, '0');
     const dd   = String(today.getUTCDate()).padStart(2, '0');
     const datePart = `${yyyy}-${mm}-${dd}`;
-    const { count } = await admin
-        .from('orders')
-        .select('id', { count: 'exact', head: true })
-        .gte('created_at', `${datePart}T00:00:00Z`)
-        .lt('created_at',  `${datePart}T23:59:59Z`);
-    const seq = String((count ?? 0) + 1).padStart(3, '0');
+    const { data: seqValue, error: seqErr } = await admin
+        .rpc('next_order_number', { p_date_part: datePart });
+    if (seqErr || typeof seqValue !== 'number') {
+        console.error('next_order_number_failed', seqErr);
+        return json(500, { error: 'order_number_failed' });
+    }
+    const seq = String(seqValue).padStart(3, '0');
     const orderNumber = `MZ-${datePart}-${seq}`;
 
     // -------------------- structured pickup timestamp --------------------
@@ -435,13 +465,36 @@ serve(async (req) => {
             pickup_at:           pickupAt,
             promo_code:          input.promoCode?.toUpperCase(),
             customer_notes:      input.notes,
-            payment_provider_ref: idemKey ? `idem:${idemKey}` : null
+            order_idempotency_key: idemKey ?? null
         })
         .select('id')
         .single();
     if (orderErr || !order) {
+        // 23505 = unique_violation. The only unique constraint we can race
+        // on here is orders_idempotency_key_unique — two concurrent retries
+        // of the same submit. The winner already wrote the row; resurface
+        // it instead of returning a 500.
+        if (orderErr?.code === '23505' && idemKey) {
+            const { data: winner } = await admin
+                .from('orders')
+                .select('id, order_number, total_agorot, status')
+                .eq('order_idempotency_key', idemKey)
+                .maybeSingle();
+            if (winner) {
+                if (isSimpleShape) {
+                    return json(200, { success: true, order_id: winner.id });
+                }
+                return json(200, {
+                    orderId: winner.id,
+                    orderNumber: winner.order_number,
+                    totalAgorot: winner.total_agorot,
+                    status: winner.status,
+                    idempotent: true
+                });
+            }
+        }
         console.error('order_insert_failed', orderErr);
-        return json(500, { error: 'order_create_failed' }, cors);
+        return json(500, { error: 'order_create_failed' });
     }
 
     const { error: itemsErr } = await admin
@@ -450,7 +503,7 @@ serve(async (req) => {
     if (itemsErr) {
         // best-effort cleanup
         await admin.from('orders').delete().eq('id', order.id);
-        return json(500, { error: 'order_items_create_failed' }, cors);
+        return json(500, { error: 'order_items_create_failed' });
     }
 
     // -------------------- audit --------------------
@@ -490,7 +543,7 @@ serve(async (req) => {
         .is('recovered_order_id', null);
 
     if (isSimpleShape) {
-        return json(200, { success: true, order_id: order.id }, cors);
+        return json(200, { success: true, order_id: order.id });
     }
 
     return json(200, {
@@ -498,12 +551,12 @@ serve(async (req) => {
         orderNumber,
         totalAgorot: Number(totalAgorot),
         status: 'pending'
-    }, cors);
+    });
 });
 
-function json(status: number, body: unknown, cors: Record<string, string>) {
+function json(status: number, body: unknown) {
     return new Response(JSON.stringify(body), {
         status,
-        headers: { ...cors, 'content-type': 'application/json' }
+        headers: { ...corsHeaders, 'content-type': 'application/json' }
     });
 }
