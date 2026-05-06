@@ -41,17 +41,7 @@ import { checkRateLimit } from '../_shared/rate-limit.ts';
 import { normalizeILPhone, isE164 } from '../_shared/phone.ts';
 import { enqueueNotification } from '../_shared/notifications/enqueue.ts';
 import { firstName } from '../_shared/notifications/templates.ts';
-
-// Wildcard CORS — every browser origin is allowed to invoke place-order.
-// `x-idempotency-key` is included because the client uses it to dedupe
-// place-order retries; omitting it from the preflight allowlist would
-// block the second-and-later submits of the same idempotent request.
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers':
-        'authorization, x-client-info, apikey, content-type, x-idempotency-key',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+import { corsHeaders as buildCorsHeaders, handleOptions } from '../_shared/cors.ts';
 
 const ItemSchema = z.object({
     productId: z.string().uuid().optional(),
@@ -116,14 +106,26 @@ const SimpleRequestSchema = z.object({
 });
 
 serve(async (req) => {
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
-    }
+    // Allowlist CORS via the shared helper. `x-idempotency-key` is included
+    // in the preflight allowlist there so retries of the same submit aren't
+    // blocked at the browser. Localhost dev + production domains come from
+    // the ALLOWED_ORIGINS env (or DEFAULT_ALLOWED in cors.ts as fallback).
+    const corsHeaders = buildCorsHeaders(req.headers.get('origin'));
+
+    const opts = handleOptions(req);
+    if (opts) return opts;
+
+    // Per-request response builder so every reply carries the resolved CORS
+    // headers. Defined inside serve() because corsHeaders depends on the
+    // request origin (see cors.ts allowlist).
+    const json = (status: number, body: unknown) =>
+        new Response(JSON.stringify(body), {
+            status,
+            headers: { ...corsHeaders, 'content-type': 'application/json' }
+        });
 
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ error: 'method_not_allowed' }), {
-            status: 405, headers: { ...corsHeaders, 'content-type': 'application/json' }
-        });
+        return json(405, { error: 'method_not_allowed' });
     }
 
     const url = Deno.env.get('SUPABASE_URL');
@@ -520,27 +522,44 @@ serve(async (req) => {
     // Always SMS the receipt — the customer hasn't opted in yet, but a single
     // transactional confirmation is allowed under IL regulation (and is what
     // the customer expects). Marketing sends require marketing_*_opt_in.
-    await enqueueNotification(admin, {
-        customerId:  customerId!,
-        orderId:     order.id,
-        channel:     'sms',
-        kind:        'order_received',
-        toPhoneE164: phoneE164,
-        idempotencyKey: `order_received:${order.id}`,
-        vars: {
-            orderNumber,
-            totalIls:  (Number(totalAgorot) / 100).toFixed(0),
-            firstName: firstName(input.contact.name)
+    //
+    // The order is already committed at this point. The enqueue path runs
+    // through the Shabbat guard + template render before touching the DB,
+    // and any of those steps could fail. We isolate the entire post-commit
+    // tail so a notifications-table outage / template bug / Shabbat-guard
+    // edge case can never roll the customer's order back.
+    try {
+        const enq = await enqueueNotification(admin, {
+            customerId:  customerId!,
+            orderId:     order.id,
+            channel:     'sms',
+            kind:        'order_received',
+            toPhoneE164: phoneE164,
+            idempotencyKey: `order_received:${order.id}`,
+            vars: {
+                orderNumber,
+                totalIls:  (Number(totalAgorot) / 100).toFixed(0),
+                firstName: firstName(input.contact.name)
+            }
+        });
+        if (!enq.ok) {
+            console.error('order_received_enqueue_failed', { orderId: order.id, reason: enq.reason });
         }
-    });
+    } catch (e) {
+        console.error('order_received_enqueue_threw', { orderId: order.id, error: (e as Error).message });
+    }
 
     // -------------------- abandoned-checkout cleanup --------------------
-    // The customer just completed; mark any in-flight abandoned cart for this
-    // phone as recovered so the campaign runner won't ping them.
-    await admin.from('abandoned_checkouts')
-        .update({ recovered_order_id: order.id })
-        .eq('phone_e164', phoneE164)
-        .is('recovered_order_id', null);
+    // Best-effort: if we can't mark the abandoned row recovered, the worst
+    // case is a stray reminder SMS — never fail the order over it.
+    try {
+        await admin.from('abandoned_checkouts')
+            .update({ recovered_order_id: order.id })
+            .eq('phone_e164', phoneE164)
+            .is('recovered_order_id', null);
+    } catch (e) {
+        console.error('abandoned_checkout_cleanup_failed', { orderId: order.id, error: (e as Error).message });
+    }
 
     if (isSimpleShape) {
         return json(200, { success: true, order_id: order.id });
@@ -553,10 +572,3 @@ serve(async (req) => {
         status: 'pending'
     });
 });
-
-function json(status: number, body: unknown) {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: { ...corsHeaders, 'content-type': 'application/json' }
-    });
-}

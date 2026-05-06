@@ -8,10 +8,7 @@ import { trackEvent, ANALYTICS_EVENTS } from '../../utils/analytics';
 // Mobile-only thumb-zone CTA bar. Shows after the user has scrolled past the hero.
 // The primary slot is dynamic:
 //   - Cart empty   → WhatsApp inquiry (pre-filled message so the composer isn't blank)
-//   - Cart has items → "סיום ההזמנה · ₪{total}" — opens the cart drawer (which routes
-//     to CheckoutModal, which itself falls back to WhatsApp when backend is off).
-// This preserves the bakery's WhatsApp-first reality while making sure motivated
-// buyers with items in cart never lose their selections to a blank chat thread.
+//   - Cart has items → "סיום ההזמנה · ₪{total}" — opens the cart drawer.
 const STARTER_MESSAGE = 'היי! אני רוצה להתייעץ על הזמנה מהמאפייה 🥐';
 
 const StickyMobileCTA = () => {

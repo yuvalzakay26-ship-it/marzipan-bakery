@@ -1,12 +1,13 @@
 // =====================================================================
 // Admin products data layer.
-// Reads run as the admin user (RLS lets admins see all rows including
-// is_active=false). Writes go through Edge Functions in production for
-// audit trail; for the foundation we expose direct table writes too,
-// gated by RLS.
+//
+// Reads run under the admin user's JWT — RLS lets admins see all rows
+// including drafts. Writes go through the admin-products Edge Function
+// so every mutation lands in audit_log under the actor's id; direct
+// UPDATE on public.products is fail-closed (no admin-write RLS policy).
 // =====================================================================
 
-import { getSupabase, isBackendEnabled } from '../supabase/client.js';
+import { getSupabase, invokeFunction, isBackendEnabled } from '../supabase/client.js';
 
 export async function listAllProducts() {
     if (!isBackendEnabled()) return [];
@@ -26,9 +27,9 @@ export async function listAllProducts() {
 
 export async function updateProduct(id, patch) {
     if (!isBackendEnabled()) throw new Error('backend_disabled');
-    const sb = getSupabase();
-    const { error } = await sb.from('products').update(patch).eq('id', id);
-    if (error) throw error;
+    const result = await invokeFunction('admin-products', { productId: id, patch });
+    if (!result?.ok) throw new Error(result?.error ?? 'update_failed');
+    return result.product;
 }
 
 export async function setSoldOut(id, isSoldOut) {

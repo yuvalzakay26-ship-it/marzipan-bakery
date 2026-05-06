@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Trash2, Plus, Minus, ShoppingBag, ShieldCheck, Sunrise, ArrowLeft } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { TRUST_SIGNALS } from '../../data/siteContent';
 import { trackEvent, ANALYTICS_EVENTS } from '../../utils/analytics';
-import CheckoutModal from './CheckoutModal';
 import CartUpsell from './CartUpsell';
 import BundleProgress from './BundleProgress';
 
 const CartDrawer = () => {
-    // ... useCart hook ...
+    const navigate = useNavigate();
     const {
         cartItems,
         isCartOpen,
@@ -20,7 +20,6 @@ const CartDrawer = () => {
         cartTotal
     } = useCart();
 
-    const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
     const [showClearConfirm, setShowClearConfirm] = React.useState(false);
 
     // Fire view_cart whenever the drawer is opened with items in it.
@@ -60,13 +59,17 @@ const CartDrawer = () => {
         };
     }, [isCartOpen, showClearConfirm, setIsCartOpen]);
 
+    // The drawer is preview-only. All order submission lives on /checkout —
+    // closing the drawer and navigating there keeps a single source of truth
+    // for validation, idempotency, and the place-order call.
     const handleCheckoutClick = () => {
         trackEvent(ANALYTICS_EVENTS.BEGIN_CHECKOUT, {
             value: cartTotal,
             currency: 'ILS',
             items_count: cartItems.length
         });
-        setIsCheckoutOpen(true);
+        setIsCartOpen(false);
+        navigate('/checkout');
     };
 
     const handleClearCart = () => {
@@ -80,11 +83,6 @@ const CartDrawer = () => {
 
     return (
         <>
-            <CheckoutModal
-                isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
-            />
-
             {/* Backdrop — click to close. Keyboard users use Escape (handled above). */}
             <div
                 className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] transition-opacity duration-300 ${isCartOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}

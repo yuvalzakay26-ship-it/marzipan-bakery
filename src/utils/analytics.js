@@ -132,8 +132,7 @@ export const ANALYTICS_EVENTS = {
 
     // Checkout funnel
     BEGIN_CHECKOUT:            'begin_checkout',
-    WHATSAPP_ORDER_CLICK:      'whatsapp_order_click',
-    COMPLETE_WAITING_CHECKOUT: 'whatsapp_order_click',
+    PLACE_ORDER:               'place_order',
 
     // Generic CTAs
     WHATSAPP_CLICK:            'whatsapp_click',

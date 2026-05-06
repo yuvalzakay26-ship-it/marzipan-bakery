@@ -21,7 +21,6 @@ enable_signup        = false   # Customers come in via OTP; admins are seeded ma
 enable_signup     = true
 enable_confirmations = true
 template          = "מאפיית מרציפן: קוד הכניסה שלך הוא {{ .Code }}"
-otp_expiry        = 600
 
 [auth.sms.twilio]
 # Configure these as Supabase project secrets, not in this file.
