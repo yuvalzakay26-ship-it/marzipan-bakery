@@ -1,16 +1,24 @@
 import React from 'react';
+import { isChunkLoadError, reloadForChunkError } from '../../utils/chunkReloader';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
-        this.state = { hasError: false, error: null, errorInfo: null };
+        this.state = { hasError: false, error: null, errorInfo: null, isChunkError: false };
     }
 
-    static getDerivedStateFromError() {
-        return { hasError: true };
+    static getDerivedStateFromError(error) {
+        // React.lazy() failures arrive here as render-phase errors because
+        // React swallows the underlying Promise rejection. Mark the chunk
+        // case so render() can show a neutral fallback while reload fires.
+        return { hasError: true, isChunkError: isChunkLoadError(error) };
     }
 
     componentDidCatch(error, errorInfo) {
+        if (isChunkLoadError(error)) {
+            reloadForChunkError();
+            return;
+        }
         this.setState({ error, errorInfo });
         if (import.meta.env.DEV) {
             console.error("Uncaught error:", error, errorInfo);
@@ -19,6 +27,12 @@ class ErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
+            // Stale-tab self-heal: reload is in flight (or capped). Render a
+            // blank cream surface instead of the Hebrew error UI to avoid a
+            // flash of "משהו השתבש" on every post-deploy mobile recovery.
+            if (this.state.isChunkError) {
+                return <div style={{ minHeight: '100vh', background: '#FDFBF7' }} />;
+            }
             const isDev = import.meta.env.DEV;
             return (
                 <div
