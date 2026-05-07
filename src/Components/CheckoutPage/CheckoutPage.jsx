@@ -11,7 +11,6 @@ import {
     ShieldCheck
 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
-import { invokeFunction, isBackendEnabled } from "../../lib/supabase/client";
 import SEO from "../Shared/SEO";
 
 const PHONE_REGEX = /^(\+?972|0)([23489]|5\d|7[2-9])[-.\s]?\d{7}$/;
@@ -23,24 +22,17 @@ const formatILS = (value) =>
         maximumFractionDigits: 0
     }).format(value || 0);
 
-const buildOrderPayload = (formData, cartItems, totalPrice) => ({
-    customer: {
-        name: formData.full_name.trim(),
-        phone: formData.phone.trim(),
-        address: formData.address.trim(),
-        notes: formData.notes.trim() || undefined
-    },
-    items: cartItems.map((item) => ({
-        product_id: item.id,
-        quantity: item.quantity,
-        price: item.price ?? item.priceValue ?? 0
-    })),
-    total_price: totalPrice
-});
+// Send only id + quantity — server is authoritative for name and price.
+// Anything else here would be ignored (or rejected) by the API anyway.
+const buildStripeItems = (cartItems) =>
+    cartItems.map((item) => ({
+        id: item.id,
+        quantity: item.quantity
+    }));
 
 const CheckoutPage = () => {
     const navigate = useNavigate();
-    const { cartItems, totalPrice, clearCart } = useCart();
+    const { cartItems, totalPrice } = useCart();
 
     const [formData, setFormData] = useState({
         full_name: "",
@@ -52,23 +44,14 @@ const CheckoutPage = () => {
     const [errorMsg, setErrorMsg] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    // Stable per-form-mount key. The edge function returns the same order on
-    // retry with the same key, so a network blip mid-submit can't double-charge.
-    const idempotencyKeyRef = useRef(
-        `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    );
     // Hard guard against re-entry — survives across renders even before
     // setSubmitting flips. Belt-and-suspenders with the disabled button.
     const inFlightRef = useRef(false);
-    // Set right before we redirect to /order/success so the empty-cart effect
-    // (cart was just cleared) does not race us to /products.
-    const orderPlacedRef = useRef(false);
 
     // Empty cart guard — redirect to /products. Runs in effect so we don't
     // dispatch navigation during render. Live updates: as soon as the last
     // item is removed (e.g. from another tab / drawer), the page redirects.
     useEffect(() => {
-        if (orderPlacedRef.current) return;
         if (cartItems.length === 0) {
             navigate("/products", { replace: true });
         }
@@ -116,46 +99,39 @@ const CheckoutPage = () => {
             return;
         }
 
-        if (!isBackendEnabled()) {
-            setErrorMsg("שירות ההזמנות אינו זמין כרגע. אנא נסו שוב מאוחר יותר.");
-            return;
-        }
-
         inFlightRef.current = true;
         setErrorMsg("");
         setSubmitting(true);
 
         try {
-            const payload = buildOrderPayload(formData, cartItems, totalPrice);
-            const data = await invokeFunction("place-order", payload, {
-                idempotencyKey: idempotencyKeyRef.current
+            const response = await fetch("/api/create-checkout-session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ items: buildStripeItems(cartItems) })
             });
 
-            if (!data?.success || !data?.order_id) {
-                throw new Error("invalid_response");
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                console.error("checkout_session_failed", {
+                    status: response.status,
+                    body: data
+                });
+                throw new Error(data?.error || `http_${response.status}`);
             }
 
-            orderPlacedRef.current = true;
-            clearCart();
-            navigate(`/order/success?order_id=${encodeURIComponent(data.order_id)}`, {
-                replace: true
-            });
+            if (!data?.url) {
+                console.error("checkout_session_missing_url", data);
+                throw new Error("missing_redirect_url");
+            }
+
+            window.location.href = data.url;
         } catch (err) {
             console.error("checkout_submit_failed", err);
-            const code = err?.message;
-            const msg =
-                code === "rate_limited"
-                    ? "ביצעת יותר מדי ניסיונות. אנא המתינו מספר דקות ונסו שוב."
-                    : code === "invalid_phone"
-                    ? "מספר הטלפון שהוזן אינו תקין."
-                    : code === "validation_failed"
-                    ? "אחד הפרטים שהוזנו אינו תקין. בדקו את הטופס ונסו שוב."
-                    : code === "product_unavailable" || code === "product_sold_out"
-                    ? "אחד המוצרים בעגלה אינו זמין כרגע. אנא עדכנו את העגלה ונסו שוב."
-                    : "משהו השתבש בשליחת ההזמנה. אנא נסו שוב.";
-            setErrorMsg(msg);
+            setErrorMsg(
+                "משהו השתבש במעבר לתשלום. אנא נסו שוב, ואם הבעיה נמשכת — צרו קשר."
+            );
             inFlightRef.current = false;
-        } finally {
             setSubmitting(false);
         }
     };

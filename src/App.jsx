@@ -29,8 +29,10 @@ import AccessibilityWidget from "./Components/Shared/AccessibilityWidget";
 import CookieConsent from "./Components/Shared/CookieConsent";
 
 // Phase 3 routes — lazy-loaded so they never affect the marketing-site bundle.
-const CheckoutPage       = lazy(() => import("./Components/CheckoutPage/CheckoutPage"));
-const OrderSuccess       = lazy(() => import("./Components/CheckoutPage/OrderSuccess"));
+const CheckoutPage         = lazy(() => import("./Components/CheckoutPage/CheckoutPage"));
+const CheckoutSuccessPage  = lazy(() => import("./Components/CheckoutPage/CheckoutSuccessPage"));
+const CheckoutCancelPage   = lazy(() => import("./Components/CheckoutPage/CheckoutCancelPage"));
+const OrderSuccess         = lazy(() => import("./Components/CheckoutPage/OrderSuccess"));
 const OrderConfirmation  = lazy(() => import("./Components/Checkout/OrderConfirmation"));
 const PaymentResult      = lazy(() => import("./Components/Checkout/PaymentResult"));
 const AccountPage        = lazy(() => import("./Components/Account/AccountPage"));
@@ -133,6 +135,8 @@ function App() {
 
               {/* Phase 3 — real commerce */}
               <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+              <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
               <Route path="/order/success" element={<OrderSuccess />} />
               <Route path="/order/confirmation" element={<OrderConfirmation />} />
               <Route path="/order/payment/result" element={<PaymentResult />} />
