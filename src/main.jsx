@@ -6,6 +6,9 @@ import App from './App.jsx'
 import { BrowserRouter } from 'react-router-dom'
 
 import { initGA, initChannelTracking, hasAnalyticsConsent } from './utils/analytics'
+import { installChunkReloader } from './utils/chunkReloader'
+
+installChunkReloader();
 
 // Privacy-first analytics: GA is loaded ONLY after the visitor accepts
 // analytics cookies via CookieConsent. Returning visitors who already
