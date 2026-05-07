@@ -10,6 +10,10 @@
     { "source": "/((?!assets|favicon\\.jpg|robots\\.txt|sitemap\\.xml).*)", "destination": "/index.html" }
   ],
 
+  "redirects": [
+    { "source": "/assets/(.*)\\.map", "destination": "/404", "statusCode": 404 }
+  ],
+
   "headers": [
     {
       "source": "/assets/(.*)",

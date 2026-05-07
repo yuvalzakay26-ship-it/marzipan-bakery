@@ -42,6 +42,7 @@ import { normalizeILPhone, isE164 } from '../_shared/phone.ts';
 import { enqueueNotification } from '../_shared/notifications/enqueue.ts';
 import { firstName } from '../_shared/notifications/templates.ts';
 import { corsHeaders as buildCorsHeaders, handleOptions } from '../_shared/cors.ts';
+import { createLogger, requestId } from '../_shared/logger.ts';
 
 const ItemSchema = z.object({
     productId: z.string().uuid().optional(),
@@ -115,13 +116,20 @@ serve(async (req) => {
     const opts = handleOptions(req);
     if (opts) return opts;
 
+    // Per-request correlation id + structured logger. The id is echoed back
+    // on every response via `x-request-id` so failed orders can be matched
+    // to their server log line without operator guesswork.
+    const reqId = requestId(req);
+    const log = createLogger({ fn: 'place-order', reqId });
+    const t0 = performance.now();
+
     // Per-request response builder so every reply carries the resolved CORS
     // headers. Defined inside serve() because corsHeaders depends on the
     // request origin (see cors.ts allowlist).
     const json = (status: number, body: unknown) =>
         new Response(JSON.stringify(body), {
             status,
-            headers: { ...corsHeaders, 'content-type': 'application/json' }
+            headers: { ...corsHeaders, 'content-type': 'application/json', 'x-request-id': reqId }
         });
 
     if (req.method !== 'POST') {
@@ -412,7 +420,7 @@ serve(async (req) => {
     const { data: seqValue, error: seqErr } = await admin
         .rpc('next_order_number', { p_date_part: datePart });
     if (seqErr || typeof seqValue !== 'number') {
-        console.error('next_order_number_failed', seqErr);
+        log.error('next_order_number_failed', { code: seqErr?.code, message: seqErr?.message });
         return json(500, { error: 'order_number_failed' });
     }
     const seq = String(seqValue).padStart(3, '0');
@@ -495,7 +503,7 @@ serve(async (req) => {
                 });
             }
         }
-        console.error('order_insert_failed', orderErr);
+        log.error('order_insert_failed', { code: orderErr?.code, message: orderErr?.message });
         return json(500, { error: 'order_create_failed' });
     }
 
@@ -514,7 +522,9 @@ serve(async (req) => {
         target_type: 'order',
         target_id: order.id,
         diff: { after: { order_number: orderNumber, total_agorot: Number(totalAgorot) } },
-        request_id: req.headers.get('x-request-id'),
+        // Use the resolved correlation id (upstream header or freshly
+        // minted), so audit_log rows and structured logs share an id.
+        request_id: reqId,
         ip_address: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
     });
 
@@ -543,10 +553,10 @@ serve(async (req) => {
             }
         });
         if (!enq.ok) {
-            console.error('order_received_enqueue_failed', { orderId: order.id, reason: enq.reason });
+            log.warn('order_received_enqueue_failed', { orderId: order.id, reason: enq.reason });
         }
     } catch (e) {
-        console.error('order_received_enqueue_threw', { orderId: order.id, error: (e as Error).message });
+        log.error('order_received_enqueue_threw', { orderId: order.id, message: (e as Error).message });
     }
 
     // -------------------- abandoned-checkout cleanup --------------------
@@ -558,8 +568,16 @@ serve(async (req) => {
             .eq('phone_e164', phoneE164)
             .is('recovered_order_id', null);
     } catch (e) {
-        console.error('abandoned_checkout_cleanup_failed', { orderId: order.id, error: (e as Error).message });
+        log.warn('abandoned_checkout_cleanup_failed', { orderId: order.id, message: (e as Error).message });
     }
+
+    log.info('order_placed', {
+        orderId: order.id,
+        orderNumber,
+        totalAgorot: Number(totalAgorot),
+        fulfillment: input.fulfillment,
+        durationMs: Math.round(performance.now() - t0),
+    });
 
     if (isSimpleShape) {
         return json(200, { success: true, order_id: order.id });

@@ -27,6 +27,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { z } from 'https://esm.sh/zod@3.23.8';
 import { corsHeaders, handleOptions } from '../_shared/cors.ts';
+import { createLogger, requestId } from '../_shared/logger.ts';
 
 const PatchSchema = z.object({
     price_agorot: z.number().int().nonnegative().optional(),
@@ -47,19 +48,25 @@ serve(async (req) => {
     const opts = handleOptions(req);
     if (opts) return opts;
 
-    if (req.method !== 'POST') return j(405, { error: 'method_not_allowed' }, cors);
+    // Per-request correlation id + logger. Echoed in `x-request-id` header
+    // so audit failures and update failures share a single trace point.
+    const reqId = requestId(req);
+    const log = createLogger({ fn: 'admin-products', reqId });
+    const corsWithId = { ...cors, 'x-request-id': reqId };
+
+    if (req.method !== 'POST') return j(405, { error: 'method_not_allowed' }, corsWithId);
 
     const url        = Deno.env.get('SUPABASE_URL');
     const anonKey    = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     if (!url || !anonKey || !serviceKey) {
-        return j(500, { error: 'server_misconfigured' }, cors);
+        return j(500, { error: 'server_misconfigured' }, corsWithId);
     }
 
     // ---- authenticate caller ----
     const authHeader = req.headers.get('authorization') ?? '';
     if (!authHeader.toLowerCase().startsWith('bearer ')) {
-        return j(401, { error: 'missing_token' }, cors);
+        return j(401, { error: 'missing_token' }, corsWithId);
     }
     const userClient = createClient(url, anonKey, {
         auth: { persistSession: false },
@@ -67,22 +74,22 @@ serve(async (req) => {
     });
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData?.user) {
-        return j(401, { error: 'invalid_token' }, cors);
+        return j(401, { error: 'invalid_token' }, corsWithId);
     }
     const role = (userData.user.app_metadata as Record<string, unknown> | undefined)?.role;
     if (role !== 'admin') {
-        return j(403, { error: 'forbidden' }, cors);
+        return j(403, { error: 'forbidden' }, corsWithId);
     }
     const actorId = userData.user.id;
 
     // ---- parse + validate body ----
     let body: unknown;
     try { body = await req.json(); }
-    catch { return j(400, { error: 'invalid_json' }, cors); }
+    catch { return j(400, { error: 'invalid_json' }, corsWithId); }
 
     const parsed = RequestSchema.safeParse(body);
     if (!parsed.success) {
-        return j(400, { error: 'validation_failed', details: parsed.error.flatten() }, cors);
+        return j(400, { error: 'validation_failed', details: parsed.error.flatten() }, corsWithId);
     }
     const { productId, patch } = parsed.data;
 
@@ -95,11 +102,11 @@ serve(async (req) => {
         .eq('id', productId)
         .maybeSingle();
     if (beforeErr) {
-        console.error('admin_products_load_failed', beforeErr);
-        return j(500, { error: 'load_failed' }, cors);
+        log.error('admin_products_load_failed', { code: beforeErr.code, message: beforeErr.message, productId });
+        return j(500, { error: 'load_failed' }, corsWithId);
     }
     if (!before || before.deleted_at) {
-        return j(404, { error: 'product_not_found' }, cors);
+        return j(404, { error: 'product_not_found' }, corsWithId);
     }
 
     // ---- apply update via service role ----
@@ -110,8 +117,8 @@ serve(async (req) => {
         .select('id, slug, name_he, price_agorot, is_active, is_sold_out, sort_order')
         .single();
     if (updateErr || !after) {
-        console.error('admin_products_update_failed', updateErr);
-        return j(500, { error: 'update_failed' }, cors);
+        log.error('admin_products_update_failed', { code: updateErr?.code, message: updateErr?.message, productId, actorId });
+        return j(500, { error: 'update_failed' }, corsWithId);
     }
 
     // ---- audit ----
@@ -131,17 +138,24 @@ serve(async (req) => {
         target_type: 'product',
         target_id:   productId,
         diff:        { before: beforeDiff, after: afterDiff },
-        request_id:  req.headers.get('x-request-id'),
+        // Match the correlation id used in log lines + response header so
+        // operators can join audit_log → server logs without a guess.
+        request_id:  reqId,
         ip_address:  req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
     });
     if (auditErr) {
         // Audit failures must NOT mask the data update — log loudly and
         // continue. The update has already committed; surfacing a 500
         // here would mislead the caller into thinking it failed.
-        console.error('admin_products_audit_failed', auditErr);
+        log.error('admin_products_audit_failed', { code: auditErr.code, message: auditErr.message, productId, actorId });
     }
 
-    return j(200, { ok: true, product: after }, cors);
+    log.info('admin_products_updated', {
+        productId,
+        actorId,
+        patchKeys: Object.keys(patch),
+    });
+    return j(200, { ok: true, product: after }, corsWithId);
 });
 
 function j(status: number, body: unknown, cors: Record<string, string>) {

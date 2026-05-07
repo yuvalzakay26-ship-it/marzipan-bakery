@@ -1,5 +1,6 @@
 import React from 'react';
 import { isChunkLoadError, reloadForChunkError } from '../../utils/chunkReloader';
+import { reportRenderError } from '../../utils/sentry';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -16,10 +17,17 @@ class ErrorBoundary extends React.Component {
 
     componentDidCatch(error, errorInfo) {
         if (isChunkLoadError(error)) {
+            // Chunk failures are an expected post-deploy condition.
+            // chunkReloader handles the self-heal; Sentry would just see
+            // noise that masks real crashes.
             reloadForChunkError();
             return;
         }
         this.setState({ error, errorInfo });
+        // Single point of capture for render-phase crashes. reportRenderError
+        // is a no-op in dev and when Sentry is uninitialized, so this can't
+        // double-report alongside Sentry's global handlers.
+        reportRenderError(error, errorInfo);
         if (import.meta.env.DEV) {
             console.error("Uncaught error:", error, errorInfo);
         }

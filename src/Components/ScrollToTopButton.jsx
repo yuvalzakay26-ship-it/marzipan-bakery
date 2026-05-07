@@ -42,10 +42,10 @@ const ScrollToTopButton = () => {
                 onClick={scrollToTop}
                 className={`
                     w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg border-2 border-[#D4AF37] bg-white text-[#B91C1C]
-                    [@media(hover:hover)and(pointer:fine)]:hover:bg-[#B91C1C]
-                    [@media(hover:hover)and(pointer:fine)]:hover:text-white
-                    [@media(hover:hover)and(pointer:fine)]:hover:border-[#B91C1C]
-                    [@media(hover:hover)and(pointer:fine)]:hover:-translate-y-1
+                    [@media(hover:hover)_and_(pointer:fine)]:hover:bg-[#B91C1C]
+                    [@media(hover:hover)_and_(pointer:fine)]:hover:text-white
+                    [@media(hover:hover)_and_(pointer:fine)]:hover:border-[#B91C1C]
+                    [@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-1
                     transition-all duration-300 ease-in-out focus:outline-none flex items-center justify-center touch-manipulation
                     ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"}
                 `}
